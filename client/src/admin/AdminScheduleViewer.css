@@ -1,0 +1,234 @@
+/* src/admin/AdminScheduleViewer.css */
+
+/* --- Base Calendar Style --- */
+.react-calendar-custom {
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 0.5rem; /* rounded-lg */
+  padding: 0.5rem;
+  background-color: white;
+  width: 100%;
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.25rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Navigation --- */
+.react-calendar-custom .react-calendar__navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem;
+}
+
+.react-calendar-custom .react-calendar__navigation button {
+  font-weight: 600;
+  color: #374151; /* gray-700 */
+  padding: 0.375rem;
+  border-radius: 9999px; /* rounded-full for arrows */
+  min-width: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.react-calendar-custom .react-calendar__navigation button:hover:not(:disabled) {
+  background-color: #f3f4f6; /* gray-100 */
+}
+
+.react-calendar-custom .react-calendar__navigation button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.react-calendar-custom .react-calendar__navigation__label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1f2937; /* gray-800 */
+  flex-grow: 0;
+  pointer-events: none;
+  cursor: default;
+}
+
+/* Prevent background change on hover for the main label */
+.react-calendar-custom .react-calendar__navigation__label:hover:not(:disabled),
+.react-calendar-custom .react-calendar__navigation__label:focus:not(:disabled) {
+  background-color: transparent !important;
+}
+
+/* --- Weekday Headers --- */
+.react-calendar-custom .react-calendar__month-view__weekdays {
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: #6b7280; /* gray-500 */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.react-calendar-custom .react-calendar__month-view__weekdays__weekday {
+  padding-bottom: 0.25rem;
+}
+
+.react-calendar-custom .react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none;
+  cursor: default;
+}
+
+/* --- Day Tiles --- */
+.react-calendar-custom .react-calendar__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  width: 100%;
+  border-radius: 0.375rem; /* rounded-md */
+  transition: background-color 150ms ease-in-out, color 150ms ease-in-out;
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.25rem;
+  border: none;
+  background: none;
+  color: #374151; /* gray-700 */
+  cursor: pointer;
+  position: relative; /* For positioning potential indicators like dots */
+}
+
+/* Hover/Focus for non-selected, non-range days */
+.react-calendar-custom .react-calendar__tile:enabled:hover:not(.selected-day):not(.booking-start):not(.booking-middle):not(.booking-end):not(.booking-single-day),
+.react-calendar-custom .react-calendar__tile:enabled:focus:not(.selected-day):not(.booking-start):not(.booking-middle):not(.booking-end):not(.booking-single-day) {
+  background-color: #f9fafb; /* gray-50 */
+  outline: none;
+}
+
+.react-calendar-custom .react-calendar__tile:disabled {
+  color: #9ca3af; /* gray-400 */
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Other Month Tiles (neighboring days) */
+.react-calendar-custom .react-calendar__month-view__days__day--neighboringMonth {
+  color: #d1d5db; /* gray-300 */
+}
+
+.react-calendar-custom .react-calendar__month-view__days__day--neighboringMonth:disabled {
+  color: #d1d5db; /* gray-300 */
+  opacity: 0.5;
+}
+
+/* Today */
+.react-calendar-custom .react-calendar__tile--now {
+  background: #fef9c3 !important; /* yellow-100 */
+  color: #a16207 !important; /* yellow-700 */
+  font-weight: bold;
+}
+
+.react-calendar-custom .react-calendar__tile--now:enabled:hover {
+  background: #fef08a !important; /* yellow-200 */
+}
+
+/* Selected Day */
+.react-calendar-custom .react-calendar__tile.selected-day {
+  background: #dc2626 !important; /* red-600 */
+  color: white !important;
+  font-weight: 600;
+}
+
+.react-calendar-custom .react-calendar__tile.selected-day:enabled:hover {
+  background: #b91c1c !important; /* red-700 */
+}
+
+/* --- Booking Range/Day Styles --- */
+/* Base style for days that have some booking */
+.react-calendar-custom .react-calendar__tile.has-booking {
+  font-weight: 500;
+  color: #1f2937; /* gray-800 */
+}
+
+/* Single Day Booking (appears as a circle) */
+.react-calendar-custom .react-calendar__tile.booking-single-day {
+  background-color: #a7f3d0; /* emerald-200 */
+  border-radius: 9999px; /* rounded-full */
+  color: #047857; /* emerald-700 */
+}
+
+/* Start of Multi-Day Range */
+.react-calendar-custom .react-calendar__tile.booking-start {
+  background-color: #fda4af; /* rose-300 */
+  border-top-left-radius: 9999px; /* rounded-l-full */
+  border-bottom-left-radius: 9999px; /* rounded-l-full */
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  color: #b91c1c; /* red-700 */
+}
+
+/* Middle of Multi-Day Range */
+.react-calendar-custom .react-calendar__tile.booking-middle {
+  background-color: #fda4af; /* rose-300 */
+  border-radius: 0; /* No rounding */
+  color: #b91c1c; /* red-700 */
+}
+
+/* End of Multi-Day Range */
+.react-calendar-custom .react-calendar__tile.booking-end {
+  background-color: #fda4af; /* rose-300 */
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 9999px; /* rounded-r-full */
+  border-bottom-right-radius: 9999px; /* rounded-r-full */
+  color: #b91c1c; /* red-700 */
+}
+
+/* Override: Handle case where a single day is both start and end (treat as single day) */
+.react-calendar-custom .react-calendar__tile.booking-start.booking-end {
+  background-color: #a7f3d0 !important; /* emerald-200 */
+  border-radius: 9999px !important; /* rounded-full */
+  color: #047857 !important; /* emerald-700 */
+}
+
+/* Ensure Selected Day text color remains white even if it has a range background */
+.react-calendar-custom .react-calendar__tile.selected-day.has-booking,
+.react-calendar-custom .react-calendar__tile.selected-day.booking-start,
+.react-calendar-custom .react-calendar__tile.selected-day.booking-middle,
+.react-calendar-custom .react-calendar__tile.selected-day.booking-end,
+.react-calendar-custom .react-calendar__tile.selected-day.booking-single-day {
+  color: white !important;
+}
+/* --- End Booking Range Styles --- */
+
+/* --- Focus Styles --- */
+/* Style for focus-visible state on calendar buttons */
+.react-calendar-custom button:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  /* Example focus ring - adjust color/style as needed (Tailwind red-400 ring) */
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #f87171;
+}
+
+/* Basic focus styles for other common interactive elements on the page */
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  /* Example focus ring - adjust color/style (Tailwind red-500 ring) */
+  /* box-shadow: 0 0 0 2px white, 0 0 0 4px #ef4444; */
+  /* Or just a standard outline */
+  /* outline: 2px solid #ef4444; */
+}
+
+/* --- Modal Animation --- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Utility class for applying the fade-in animation */
+.animate-fade-in-fast {
+  animation: fadeIn 0.2s ease-out forwards;
+}
