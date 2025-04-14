@@ -116,95 +116,113 @@ function formatDateTimeIST(date) {
   }
 }
 
+// Add this function to replace the missing sendEmail from mailer.js
+/**
+ * Sends an email using the configured transporter
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} html - HTML content of the email
+ * @returns {Promise<object>} Nodemailer info object
+ */
+async function sendEmail(to, subject, html) {
+  try {
+    const transporter = await createTransporter();
+    const mailOptions = {
+      from: `"Auditorium Booking System" <${emailUser}>`,
+      to,
+      subject,
+      html,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Email Sent] To: ${to} | Subject: ${subject} | Msg ID: ${info.messageId}`);
+    return info;
+  } catch (error) {
+    console.error('[Email Error] Failed to send email:', error.message || error);
+    throw error; // Re-throw to handle in calling function
+  }
+}
 
 // --- Send Booking Request Confirmation Email ---
 /**
  * Sends an email confirming that a booking request has been submitted.
  * @param {string} userEmail - The recipient's email address.
- * @param {object} bookingDetails - The populated Booking document.
- * @param {object} auditoriumDetails - The populated Auditorium document.
- * @param {object} departmentDetails - The populated Department document.
+ * @param {object} booking - The populated Booking document.
+ * @param {object} auditorium - The populated Auditorium document.
+ * @param {object} department - The populated Department document.
  * @returns {Promise<object | void>} Nodemailer info object on success, or void on failure.
  */
-exports.sendBookingRequestEmail = async (userEmail, bookingDetails, auditoriumDetails, departmentDetails) => {
-  try {
-    // --- Input Validation ---
-    if (!userEmail) throw new Error('Recipient email is missing for request email.');
-    if (!bookingDetails?._id) throw new Error('Booking details (with _id) missing for request email.');
-    if (!auditoriumDetails?.name) throw new Error('Auditorium details (with name) missing for request email.');
-    if (!departmentDetails?.name) throw new Error('Department details (with name) missing for request email.');
+exports.sendBookingRequestEmail = async (userEmail, booking, auditorium, department) => {
+    try {
+        const partialBookingId = booking._id.toString().slice(-6);
+        const startTimeIST = DateTime.fromJSDate(booking.startTime)
+            .setZone(istTimezone)
+            .toFormat("EEE, dd MMM, yyyy, h:mm a");
+        
+        const endTimeIST = DateTime.fromJSDate(booking.endTime)
+            .setZone(istTimezone)
+            .toFormat("EEE, dd MMM, yyyy, h:mm a");
 
-    const transporter = await createTransporter(); // Get a configured transporter instance
-    const partialBookingId = bookingDetails._id.toString().slice(-6); // For subject/reference
+        const status = 'PENDING';
+        
+        const mailOptions = {
+            from: `"Auditorium Booking System" <${emailUser}>`,
+            to: userEmail,
+            subject: `⏳ PENDING: Auditorium Booking (#${partialBookingId})`,
+            text: `Hi there,
 
-    // --- Prepare Email Content ---
-    const startTimeIST = formatDateTimeIST(bookingDetails.startTime);
-    const endTimeIST = formatDateTimeIST(bookingDetails.endTime);
-    const auditoriumName = auditoriumDetails.name || 'N/A';
-    const auditoriumLocation = auditoriumDetails.location || 'N/A';
-    const departmentName = departmentDetails.name || 'N/A';
-    const eventName = bookingDetails.eventName || 'N/A';
-    const description = bookingDetails.description || 'N/A';
-    const status = bookingDetails.status?.toUpperCase() || 'PENDING';
+Your request to book ${auditorium.name} for the event "${booking.eventName}" (Department: ${department.name}) has been submitted successfully and is now PENDING.
 
-    const mailOptions = {
-      from: `"Auditorium Booking System" <${emailUser}>`, // Sender display name and address
-      to: userEmail,
-      subject: `[Pending] Auditorium Booking Request Submitted (#${partialBookingId})`,
-      // --- Plain Text Version ---
-      text: `Hi there,\n\n` +
-            `Your request to book "${auditoriumName}" for the event "${eventName}" ` +
-            `(Department: ${departmentName}) has been submitted successfully and is pending administrator approval.\n\n` +
-            `Booking Details:\n` +
-            `--------------------\n` +
-            `ID: ...${partialBookingId}\n` +
-            `Event: ${eventName}\n` +
-            `Description: ${description}\n` +
-            `Auditorium: ${auditoriumName} (${auditoriumLocation})\n` +
-            `Department: ${departmentName}\n` +
-            `Start Time: ${startTimeIST}\n` + // IST implied by context or add (IST)
-            `End Time: ${endTimeIST}\n` +     // IST implied by context or add (IST)
-            `Status: ${status}\n` +
-            `--------------------\n\n` +
-            `You will receive another email once your request is reviewed (approved or rejected).\n\n` +
-            `Thanks,\nThe Auditorium Management Team`,
-      // --- HTML Version ---
-      html: `
-        <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <p>Hi there,</p>
-          <p>Your request to book <strong>${auditoriumName}</strong> for the event "<strong>${eventName}</strong>" (Department: <strong>${departmentName}</strong>) has been submitted successfully and is now <strong>${status}</strong>.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 18px; font-weight: bold;">Booking Details:</p>
-          <ul style="list-style: none; padding-left: 0;">
-            <li><strong>ID:</strong> ...${partialBookingId}</li>
-            <li><strong>Event:</strong> ${eventName}</li>
-            <li><strong>Description:</strong> ${description}</li>
-            <li><strong>Auditorium:</strong> ${auditoriumName} (${auditoriumLocation})</li>
-            <li><strong>Department:</strong> ${departmentName}</li>
-            <li><strong>Start Time:</strong> ${startTimeIST}</li>
-            <li><strong>End Time:</strong> ${endTimeIST}</li>
-            <li><strong>Status:</strong> <span style="font-weight: bold; color: #ffc107;">${status}</span></li>
-          </ul>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p>You will receive another email once your request is reviewed by the administrator (approved or rejected).</p>
-          <p>Thanks,<br>The Auditorium Management Team</p>
-        </div>
-      `,
-    };
+Booking Details:
 
-    // --- Send Email ---
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email Sent] Booking request confirmation to: ${userEmail} | Booking ID: ${bookingDetails._id} | Msg ID: ${info.messageId}`);
-    return info; // Return mail info (messageId, etc.)
+ID: ...${partialBookingId}
+Event: ${booking.eventName}
+Description: ${booking.description || 'N/A'}
+Auditorium: ${auditorium.name} (${auditorium.location})
+Department: ${department.name}
+Start Time: ${startTimeIST}
+End Time: ${endTimeIST}
+Status: ${status}
 
-  } catch (error) {
-    // Log detailed error but don't crash the primary operation (e.g., booking creation)
-    console.error(`[Email Error] Failed sending booking request confirmation to ${userEmail} for booking ${bookingDetails?._id}:`, error.message || error);
-    // Depending on requirements, you might want to log this error to a more persistent store
-    // return; // Indicate failure without throwing
-  }
+You will receive another email once your request is reviewed by the administrator (approved or rejected).
+
+Thanks,
+The Auditorium Management Team`,
+            html: `
+                <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
+                    <p>Hi there,</p>
+                    
+                    <p>Your request to book <strong>${auditorium.name}</strong> for the event "<strong>${booking.eventName}</strong>" (Department: ${department.name}) has been submitted successfully and is now <strong style="color: #ffc107;">${status}</strong>.</p>
+                    
+                    <p><strong>Booking Details:</strong></p>
+                    
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li><strong>ID:</strong> ...${partialBookingId}</li>
+                        <li><strong>Event:</strong> ${booking.eventName}</li>
+                        <li><strong>Description:</strong> ${booking.description || 'N/A'}</li>
+                        <li><strong>Auditorium:</strong> ${auditorium.name} (${auditorium.location})</li>
+                        <li><strong>Department:</strong> ${department.name}</li>
+                        <li><strong>Start Time:</strong> ${startTimeIST}</li>
+                        <li><strong>End Time:</strong> ${endTimeIST}</li>
+                        <li><strong>Status:</strong> <span style="color: #ffc107; font-weight: bold;">${status}</span></li>
+                    </ul>
+                    
+                    <p>You will receive another email once your request is reviewed by the administrator (approved or rejected).</p>
+                    
+                    <p>Thanks,<br>The Auditorium Management Team</p>
+                </div>
+            `
+        };
+
+        const info = await sendEmail(userEmail, mailOptions.subject, mailOptions.html);
+        console.log(`[Email Sent] Booking request confirmation to: ${userEmail} | Booking ID: ${booking._id}`);
+        return info;
+
+    } catch (error) {
+        console.error(`[Email Error] Failed to send booking request email to ${userEmail}:`, error);
+        // Don't throw - we don't want email failures to break the booking process
+    }
 };
-
 
 // --- Send Booking Approval Email ---
 /**

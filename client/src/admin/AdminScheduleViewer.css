@@ -153,6 +153,11 @@
   color: #047857; /* emerald-700 */
 }
 
+.booking-single-day {
+  background-color: rgb(254 226 226) !important; /* red-100 */
+  border: 1px solid rgb(254 202 202) !important; /* red-200 */
+}
+
 /* Start of Multi-Day Range */
 .react-calendar-custom .react-calendar__tile.booking-start {
   background-color: #fda4af; /* rose-300 */
@@ -163,11 +168,25 @@
   color: #b91c1c; /* red-700 */
 }
 
+.booking-start {
+  background-color: rgb(254 226 226) !important; /* red-100 */
+  border: 1px solid rgb(254 202 202) !important; /* red-200 */
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
 /* Middle of Multi-Day Range */
 .react-calendar-custom .react-calendar__tile.booking-middle {
   background-color: #fda4af; /* rose-300 */
   border-radius: 0; /* No rounding */
   color: #b91c1c; /* red-700 */
+}
+
+.booking-middle {
+  background-color: rgb(254 242 242) !important; /* red-50 */
+  border-top: 1px solid rgb(254 202 202) !important; /* red-200 */
+  border-bottom: 1px solid rgb(254 202 202) !important; /* red-200 */
+  border-radius: 0 !important;
 }
 
 /* End of Multi-Day Range */
@@ -178,6 +197,13 @@
   border-top-right-radius: 9999px; /* rounded-r-full */
   border-bottom-right-radius: 9999px; /* rounded-r-full */
   color: #b91c1c; /* red-700 */
+}
+
+.booking-end {
+  background-color: rgb(254 226 226) !important; /* red-100 */
+  border: 1px solid rgb(254 202 202) !important; /* red-200 */
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
 }
 
 /* Override: Handle case where a single day is both start and end (treat as single day) */

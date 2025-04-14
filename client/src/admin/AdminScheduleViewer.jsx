@@ -121,6 +121,29 @@ function AdminScheduleViewer() {
                              showNeighboringMonth={false} // Simplify view to current month only
                          />
                       )}
+                      {!isLoadingSchedule && selectedAuditoriumId && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">Calendar Legend</h4>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
+                                    <span className="text-gray-600">Single Day Event</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-4 rounded-l-full bg-red-100 border border-red-200"></div>
+                                    <span className="text-gray-600">Event Start</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-4 bg-red-50 border-t border-b border-red-200"></div>
+                                    <span className="text-gray-600">Event Middle</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-4 rounded-r-full bg-red-100 border border-red-200"></div>
+                                    <span className="text-gray-600">Event End</span>
+                                </div>
+                            </div>
+                        </div>
+                      )}
                      {!selectedAuditoriumId && <div className="min-h-[350px] flex items-center justify-center"><p className="text-gray-500">Select an auditorium to view its schedule.</p></div>}
                  </div>
 

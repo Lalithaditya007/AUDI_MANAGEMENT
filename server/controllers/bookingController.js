@@ -60,161 +60,63 @@ const cleanupUploadedFileOnError = (file) => {
  * @route   POST /api/bookings
  * @access  Private (User - needs login)
  */
-exports.createBooking = async (req, res, next) => {
-  const { eventName, description, startTime, endTime, auditorium: auditoriumId, department: departmentId } = req.body;
-  const user = req.user; // Assuming user is attached by auth middleware
-  const uploadedFile = req.file; // Assuming multer middleware is used
-
-  console.log(`[API Call] POST /api/bookings | User: ${user?._id}`);
-  console.log("[DEBUG] Received Body:", req.body, "File:", uploadedFile ? uploadedFile.filename : 'No file');
-
-  // --- Basic Validation ---
-  if (!eventName || !startTime || !endTime || !auditoriumId || !departmentId) {
-    cleanupUploadedFileOnError(uploadedFile);
-    return res.status(400).json({ success: false, message: 'Missing required fields (Event Name, Start Time, End Time, Auditorium, Department).' });
-  }
-  if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {
-    cleanupUploadedFileOnError(uploadedFile);
-    return res.status(400).json({ success: false, message: 'Invalid Auditorium ID format.' });
-  }
-  if (!mongoose.Types.ObjectId.isValid(departmentId)) {
-    cleanupUploadedFileOnError(uploadedFile);
-    return res.status(400).json({ success: false, message: 'Invalid Department ID format.' });
-  }
-
-  try {
-    // --- Date/Time Validation ---
-    const startLuxon = DateTime.fromISO(startTime);
-    const endLuxon = DateTime.fromISO(endTime);
-
-    if (!startLuxon.isValid || !endLuxon.isValid) {
-      cleanupUploadedFileOnError(uploadedFile);
-      return res.status(400).json({ success: false, message: 'Invalid date/time format provided. Use ISO 8601 format (e.g., YYYY-MM-DDTHH:mm).' });
-    }
-
-    const startDate = startLuxon.toJSDate();
-    const endDate = endLuxon.toJSDate();
-
-    if (startDate >= endDate) {
-      cleanupUploadedFileOnError(uploadedFile);
-      return res.status(400).json({ success: false, message: 'Booking end time must be strictly after the start time.' });
-    }
-
-    // Check against opening hours (using IST)
-    const startLuxonIST = startLuxon.setZone(istTimezone);
-    if (startLuxonIST.hour < openingHourIST) {
-      cleanupUploadedFileOnError(uploadedFile);
-      return res.status(400).json({ success: false, message: `Bookings cannot start before ${openingHourIST}:00 AM ${istTimezone}.` });
-    }
-
-    // Check lead time requirement
-    const now = DateTime.now();
-    if (startLuxon < now.plus({ hours: bookingLeadTimeHours })) {
-      cleanupUploadedFileOnError(uploadedFile);
-      return res.status(400).json({ success: false, message: `Bookings must be made at least ${bookingLeadTimeHours} hours in advance.` });
-    }
-
-    // --- Check Existence of References ---
-    const auditorium = await Auditorium.findById(auditoriumId).lean(); // Use lean for read-only check
-    if (!auditorium) {
-      cleanupUploadedFileOnError(uploadedFile);
-      return res.status(404).json({ success: false, message: `Auditorium with ID ${auditoriumId} not found.` });
-    }
-
-    const department = await Department.findById(departmentId).lean();
-    if (!department) {
-      cleanupUploadedFileOnError(uploadedFile);
-      return res.status(404).json({ success: false, message: `Department with ID ${departmentId} not found.` });
-    }
-
-    // --- Check for Time Slot Conflicts (against APPROVED bookings) ---
-    const conflict = await Booking.findOne({
-      auditorium: auditoriumId,
-      status: 'approved',
-      // Overlap condition: (ExistingStart < NewEnd) AND (ExistingEnd > NewStart)
-      startTime: { $lt: endDate },
-      endTime: { $gt: startDate },
-    }).populate('user', 'username'); // Populate for better error message
-
-    if (conflict) {
-      cleanupUploadedFileOnError(uploadedFile);
-      const conflictStartIST = DateTime.fromJSDate(conflict.startTime).setZone(istTimezone).toFormat('ff'); // Format: Date Time Zone
-      const conflictEndIST = DateTime.fromJSDate(conflict.endTime).setZone(istTimezone).toFormat('ff');
-      return res.status(409).json({ // 409 Conflict
-        success: false,
-        message: `Time slot unavailable. It conflicts with an existing approved booking for '${conflict.eventName}' by ${conflict.user?.username || 'another user'} from ${conflictStartIST} to ${conflictEndIST}.`,
-        conflict: { // Provide conflict details if needed by the frontend
-          eventName: conflict.eventName,
-          startTime: conflict.startTime,
-          endTime: conflict.endTime,
-          user: conflict.user?.username || null,
-        },
-      });
-    }
-
-    // --- Create Booking Document ---
-    const bookingData = {
-      eventName,
-      description,
-      startTime: startDate,
-      endTime: endDate,
-      auditorium: auditoriumId,
-      user: user._id,
-      department: departmentId,
-      status: 'pending', // Default status
-      eventImages: uploadedFile ? [`/uploads/${uploadedFile.filename}`] : [], // Store relative path
-    };
-
-    const newBooking = await Booking.create(bookingData);
-    console.log(`[Success] Booking created with ID: ${newBooking._id}, Status: ${newBooking.status}`);
-
-    // --- Send Notification Email (Non-critical) ---
+exports.createBooking = async (req, res) => {
     try {
-      const populatedBooking = await Booking.findById(newBooking._id)
-        .populate('user', 'email username')
-        .populate('auditorium', 'name location')
-        .populate('department', 'name');
+        // Get the file path if an image was uploaded
+        const eventImage = req.file ? `/uploads/${req.file.filename}` : null;
 
-      if (!populatedBooking) {
-        console.warn(`[Email Error] Could not re-fetch booking ${newBooking._id} after creation for email.`);
-      } else if (populatedBooking.user?.email && populatedBooking.auditorium && populatedBooking.department) {
-        await sendBookingRequestEmail(populatedBooking.user.email, populatedBooking, populatedBooking.auditorium, populatedBooking.department);
-        console.log(`[Email Sent] Booking request email sent for ${newBooking._id} to ${populatedBooking.user.email}`);
-      } else {
-        console.warn(`[Email Skipped] Missing user email, auditorium, or department for booking ${newBooking._id}. Cannot send request email.`);
-      }
-    } catch (emailError) {
-      // Log email error but don't fail the request
-      console.error(`[Non-critical Error] Failed sending booking request email for ${newBooking._id}:`, emailError.message || emailError);
+        const booking = await Booking.create({
+            eventName: req.body.eventName,
+            description: req.body.description,
+            startTime: req.body.startTime,
+            endTime: req.body.endTime,
+            auditorium: req.body.auditorium,
+            department: req.body.department,
+            user: req.user._id,
+            eventImages: eventImage ? [eventImage] : [], // Save the path in the array
+            status: 'pending'
+        });
+
+        // Populate necessary fields for the email
+        const populatedBooking = await Booking.findById(booking._id)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name location')
+            .populate('department', 'name');
+
+        // Send pending booking notification email
+        try {
+            await sendBookingRequestEmail(
+                populatedBooking.user.email,
+                populatedBooking,
+                populatedBooking.auditorium,
+                populatedBooking.department
+            );
+            console.log(`[Email Sent] Booking request confirmation sent for ${booking._id} to ${populatedBooking.user.email}`);
+        } catch (emailError) {
+            console.error(`[Non-critical Error] Failed sending booking request email for ${booking._id}:`, emailError);
+            // Don't throw error - continue with response even if email fails
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Booking created successfully',
+            data: booking
+        });
+
+    } catch (error) {
+        // If error occurs, delete uploaded file
+        if (req.file) {
+            const fs = require('fs');
+            fs.unlink(req.file.path, (err) => {
+                if (err) console.error('Error deleting file:', err);
+            });
+        }
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
-
-    // --- Success Response ---
-    res.status(201).json({
-      success: true,
-      message: 'Booking request submitted successfully and is pending approval.',
-      data: newBooking, // Return the created booking object
-    });
-
-  } catch (error) {
-    // --- Error Handling ---
-    cleanupUploadedFileOnError(uploadedFile); // Attempt cleanup on any error
-    console.error("[Error] Create booking failed:", error);
-
-    if (error.name === 'ValidationError' || error.name === 'CastError') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    // Check for specific upload errors if using middleware like multer-gridfs-storage
-    if (error.message?.includes('Upload rejected')) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-
-    // Generic server error if no specific error was handled
-    if (!res.headersSent) {
-      res.status(500).json({ success: false, message: 'Server error occurred during booking creation.' });
-    }
-  }
 };
-
 
 /**
  * @desc    Get bookings made by the currently logged-in user
@@ -1053,7 +955,9 @@ exports.getPublicEvents = async (req, res) => {
     })
     .sort({ startTime: 1 })
     .populate('auditorium', 'name')
-    .select('eventName startTime endTime auditorium');
+    .select('eventName startTime endTime auditorium eventImages'); // Added eventImages field
+
+    console.log('Found events:', events); // Debug log
 
     res.status(200).json({
       success: true,

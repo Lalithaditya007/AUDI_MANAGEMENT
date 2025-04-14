@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import KSAudi from "../../assets/ksaudi.jpg";
 import PEB from "../../assets/PEB.jpg";
+import bblock from "../../assets/bblock.jpg";
 
 const Auditoriums = () => {
   const auditoriums = [
@@ -16,8 +17,8 @@ const Auditoriums = () => {
       name: "B Block Seminar Hall",
       description: "A spacious seminar hall for academic talks and presentations.",
       capacity: "200 Seats",
-      link: "/b-block-seminar-hall",
-      image: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80"
+      link: "/bblock",
+      image: bblock
     },
     {
       name: "APJ Abdul Kalam Seminar Hall",

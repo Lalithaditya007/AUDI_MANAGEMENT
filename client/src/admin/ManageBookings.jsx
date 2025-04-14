@@ -381,7 +381,7 @@ const ManageBookings = () => {
           </div>
         )}
         {fetchError && !isLoading && (
-          <div className="mb-8 p-4 text-center text-red-800 bg-red-100 rounded-lg border border-red-200 shadow">
+          <div class="mb-8 p-4 text-center text-red-800 bg-red-100 rounded-lg border border-red-200 shadow">
             <p><strong>Error loading requests:</strong> {fetchError}</p>
             <button
               onClick={fetchAllBookings}
@@ -495,7 +495,7 @@ const ManageBookings = () => {
                   // Determine image status
                   const imagePath = booking.eventImages?.[0];
                   const fullImageUrl = imagePath
-                    ? `${import.meta.env.VITE_API_URL || "http://localhost:5001"}${imagePath}`
+                    ? `${import.meta.env.VITE_API_URL || "http://localhost:5001"}/uploads/${imagePath.split('/').pop()}`
                     : null;
                   const imgHasError = imgErrors[booking._id] || false; // Check specific error state
 
@@ -518,7 +518,10 @@ const ManageBookings = () => {
                               src={fullImageUrl}
                               alt={`${booking.eventName || "Event"} Poster`}
                               className="w-full h-full object-cover"
-                              onError={() => handleImageError(booking._id)} // Set error state on load fail
+                              onError={(e) => {
+                                console.error(`Failed to load image: ${fullImageUrl}`); // Add debug log
+                                handleImageError(booking._id);
+                              }}
                               loading="lazy" // Improve performance
                             />
                           ) : imgHasError ? (

@@ -29,8 +29,8 @@ const HomePage = () => {
           >
             <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
               A Space to Chill,
-              <span className="text-red-500"> A Place to Learn</span>
-            </h1>
+              <span className="text-red-600 font-extrabold"> A Place to Learn</span>
+            </h1> 
             <p className="text-xl md:text-2xl text-gray-200 font-light max-w-3xl mx-auto">
               Where Moments Turn into Memories
             </p>
@@ -75,9 +75,9 @@ const HomePage = () => {
 
       {/* Events Section with Enhanced Styling */}
       <section className="py-20 relative overflow-hidden">
-        {/* Background gradient updated for better contrast */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-red-800 to-gray-900">
-          <div className="absolute inset-0 bg-[url('/src/assets/pattern.png')] opacity-5"></div>
+        {/* Background with light white color */}
+        <div className="absolute inset-0 bg-gray-50/90">
+          <div className="absolute inset-0 bg-[url('/src/assets/pattern.png')] opacity-10 mix-blend-overlay"></div>
         </div>
         
         <motion.div
@@ -94,8 +94,7 @@ const HomePage = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-4xl md:text-5xl font-bold mb-4"
             >
-              {/* Updated gradient colors for better visibility */}
-              <span className="bg-gradient-to-r from-white via-red-100 to-white bg-clip-text text-transparent">
+              <span className="text-[#82181A]">
                 Current & Upcoming Events
               </span>
             </motion.h2>
@@ -107,8 +106,8 @@ const HomePage = () => {
             />
           </div>
           
-          {/* Updated container styling with better contrast */}
-          <div className="max-w-4xl mx-auto backdrop-blur-md bg-white/10 rounded-2xl p-6 shadow-2xl border border-white/20">
+          {/* Updated container styling with themed border */}
+          <div className="max-w-4xl mx-auto backdrop-blur-md bg-white/10 rounded-2xl p-6 shadow-2xl border-2 border-[#82181A]/20">
             <Events />
           </div>
           
@@ -118,26 +117,7 @@ const HomePage = () => {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="mt-8 text-center"
           >
-            {/* Updated link colors for better visibility */}
-            <a 
-              href="/calendar" 
-              className="inline-flex items-center gap-2 text-white hover:text-red-200 transition-colors duration-300 group"
-            >
-              View Full Calendar
-              <svg 
-                className="w-4 h-4 transform transition-transform group-hover:translate-x-1" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth="2" 
-                  d="M17 8l4 4m0 0l-4 4m4-4H3"
-                />
-              </svg>
-            </a>
+           
           </motion.div>
         </motion.div>
       </section>
