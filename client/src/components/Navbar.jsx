@@ -33,92 +33,96 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
     };
 
     return (
-        <nav className={`p-4 shadow-md ${isHomePage ? "bg-transparent" : "bg-white"}`}>
-            <div className="container mx-auto flex justify-between items-center flex-wrap">
-                <div className="flex items-center space-x-4 mb-2 sm:mb-0 mr-4">
-                    <img
-                        src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
-                        alt="VNR VJIET Symbol"
-                        className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0"
-                    />
-                    <div>
-                        <h1 className="text-lg sm:text-xl font-bold text-red-900 leading-tight">
-                            Vallurupalli Nageswara Rao <br className="hidden sm:inline" />Vignana Jyothi Institute
-                        </h1>
-                        <p className="text-xs sm:text-sm text-red-900">Vignana Jyothi Nagar, Hyderabad</p>
+        <>
+            <nav className={`fixed top-0 left-0 right-0 p-4 shadow-md z-50 ${isHomePage ? "bg-white/20" : "bg-white/20"} backdrop-blur-sm transition-all duration-300`}>
+                <div className="container mx-auto flex justify-between items-center flex-wrap">
+                    <div className="flex items-center space-x-4 mb-2 sm:mb-0 mr-4">
+                        <img
+                            src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
+                            alt="VNR VJIET Symbol"
+                            className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0"
+                        />
+                        <div>
+                            <h1 className="text-lg sm:text-xl font-bold text-red-900 leading-tight">
+                                Vallurupalli Nageswara Rao <br className="hidden sm:inline" />Vignana Jyothi Institute
+                            </h1>
+                            <p className="text-xs sm:text-sm text-red-900">Vignana Jyothi Nagar, Hyderabad</p>
+                        </div>
                     </div>
-                </div>
 
-                <ul className="flex flex-wrap space-x-1 sm:space-x-2 items-center text-sm sm:text-base">
-                    <li>
-                        <NavLink to="/" className={getNavLinkClass} end>
-                            Home
-                        </NavLink>
-                    </li>
-                    {!isLoggedIn && (
-                        <>
-                            <li>
-                                <NavLink to="/auditoriums" className={getNavLinkClass}>
-                                    Auditoriums
-                                </NavLink>
-                            </li>
-                            {!isLoginPage && (
+                    <ul className="flex flex-wrap space-x-1 sm:space-x-2 items-center text-sm sm:text-base">
+                        <li>
+                            <NavLink to="/" className={getNavLinkClass} end>
+                                Home
+                            </NavLink>
+                        </li>
+                        {!isLoggedIn && (
+                            <>
                                 <li>
-                                    <NavLink to="/login" className={getNavLinkClass}>
-                                        Login
+                                    <NavLink to="/auditoriums" className={getNavLinkClass}>
+                                        Auditoriums
                                     </NavLink>
                                 </li>
-                            )}
-                        </>
-                    )}
-                    {isLoggedIn && (
-                        <>
-                            {userRole === "user" && (
-                                <>
+                                {!isLoginPage && (
                                     <li>
-                                        <NavLink to="/book-auditorium" className={getNavLinkClass}>
-                                            Book Auditorium
+                                        <NavLink to="/login" className={getNavLinkClass}>
+                                            Login
                                         </NavLink>
                                     </li>
-                                    <li>
-                                        <NavLink to="/booking-history" className={getNavLinkClass}>
-                                            History
-                                        </NavLink>
-                                    </li>
-                                </>
-                            )}
-                            {userRole === "admin" && (
-                                <>
-                                    <li>
-                                        <NavLink to="/admin-dashboard" className={getNavLinkClass}>
-                                            Dashboard
-                                        </NavLink>
-                                    </li>
-                                    <li>
-                                        <NavLink to="/manage-bookings" className={getNavLinkClass}>
-                                            Manage
-                                        </NavLink>
-                                    </li>
-                                    <li>
-                                        <NavLink to="/admin/schedule-viewer" className={getNavLinkClass}>
-                                            Schedule
-                                        </NavLink>
-                                    </li>
-                                </>
-                            )}
-                            <li>
-                                <button
-                                    onClick={handleLogout}
-                                    className={`${baseNavLinkClass} ${defaultNavLinkHoverClass} bg-transparent border-none cursor-pointer p-0 px-2 py-1`}
-                                >
-                                    Logout
-                                </button>
-                            </li>
-                        </>
-                    )}
-                </ul>
-            </div>
-        </nav>
+                                )}
+                            </>
+                        )}
+                        {isLoggedIn && (
+                            <>
+                                {userRole === "user" && (
+                                    <>
+                                        <li>
+                                            <NavLink to="/book-auditorium" className={getNavLinkClass}>
+                                                Book Auditorium
+                                            </NavLink>
+                                        </li>
+                                        <li>
+                                            <NavLink to="/booking-history" className={getNavLinkClass}>
+                                                History
+                                            </NavLink>
+                                        </li>
+                                    </>
+                                )}
+                                {userRole === "admin" && (
+                                    <>
+                                        <li>
+                                            <NavLink to="/admin-dashboard" className={getNavLinkClass}>
+                                                Dashboard
+                                            </NavLink>
+                                        </li>
+                                        <li>
+                                            <NavLink to="/manage-bookings" className={getNavLinkClass}>
+                                                Manage
+                                            </NavLink>
+                                        </li>
+                                        <li>
+                                            <NavLink to="/admin/schedule-viewer" className={getNavLinkClass}>
+                                                Schedule
+                                            </NavLink>
+                                        </li>
+                                    </>
+                                )}
+                                <li>
+                                    <button
+                                        onClick={handleLogout}
+                                        className={`${baseNavLinkClass} ${defaultNavLinkHoverClass} bg-transparent border-none cursor-pointer p-0 px-2 py-1`}
+                                    >
+                                        Logout
+                                    </button>
+                                </li>
+                            </>
+                        )}
+                    </ul>
+                </div>
+            </nav>
+            {/* This div adds padding to prevent content from hiding behind the fixed navbar */}
+            <div className="h-24 sm:h-28"></div>
+        </>
     );
 };
 
