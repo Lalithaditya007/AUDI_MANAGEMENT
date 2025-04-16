@@ -55,6 +55,8 @@ function BookingHistory() {
   const [rescheduleBooking, setRescheduleBooking] = useState(null);
   const [modalStartTime, setModalStartTime] = useState("");
   const [modalEndTime, setModalEndTime] = useState("");
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawBooking, setWithdrawBooking] = useState(null);
   // Modal Availability State
   const [isCheckingModalAvailability, setIsCheckingModalAvailability] = useState(false);
   const [modalAvailabilityError, setModalAvailabilityError] = useState(""); // CHECK error
@@ -117,14 +119,51 @@ function BookingHistory() {
   useEffect(() => { return () => { /* Cleanup on unmount */ }; }, []);
 
   // --- Action Handlers ---
-  const handleWithdraw = async (bookingId) => {
-    if (withdrawingId || isSubmittingReschedule) return; if (!window.confirm("Confirm withdrawal?")) return;
-    setActionError(""); setActionSuccess(""); setWithdrawingId(bookingId);
-    const token = localStorage.getItem('authToken'); if (!token) {showTemporaryFeedback(setActionError,"Auth Err."); setWithdrawingId(null); return;}
-    const url=`${API_BASE_URL}/api/bookings/${bookingId}`; console.log(`DELETE ${url}`);
-    try {const res=await fetch(url,{method:"DELETE",headers:{"Authorization":`Bearer ${token}`, Accept:"json"}}); const data=await res.json(); if(!res.ok)throw new Error(data.message||`Withdraw fail(${res.status})`); showTemporaryFeedback(setActionSuccess,data.message||"Withdrawn!", 7000); setBookings(p=>p.filter(b=>b._id!==bookingId));}
-    catch(e){console.error(`Withdraw err ${bookingId}:`,e);showTemporaryFeedback(setActionError,e.message||"Withdraw fail.");} finally{setWithdrawingId(null);}
+  const handleWithdraw = async (booking) => {
+    if (withdrawingId || isSubmittingReschedule) return;
+    setWithdrawBooking(booking);
+    setShowWithdrawModal(true);
   };
+
+  const confirmWithdraw = async () => {
+    if (!withdrawBooking || withdrawingId || isSubmittingReschedule) return;
+    
+    setActionError("");
+    setActionSuccess("");
+    setWithdrawingId(withdrawBooking._id);
+    
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        showTemporaryFeedback(setActionError, "Auth Error");
+        setWithdrawingId(null);
+        setShowWithdrawModal(false);
+        setWithdrawBooking(null);
+        return;
+    }
+
+    const url = `${API_BASE_URL}/api/bookings/${withdrawBooking._id}`;
+    try {
+        const res = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                Accept: "json"
+            }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `Withdrawal failed (${res.status})`);
+        
+        showTemporaryFeedback(setActionSuccess, data.message || "Successfully withdrawn!", 7000);
+        setBookings(prev => prev.filter(b => b._id !== withdrawBooking._id));
+    } catch (err) {
+        console.error(`Withdraw error:`, err);
+        showTemporaryFeedback(setActionError, err.message || "Failed to withdraw booking");
+    } finally {
+        setWithdrawingId(null);
+        setShowWithdrawModal(false);
+        setWithdrawBooking(null);
+    }
+};
 
   // --- Reschedule Modal Handlers ---
   const openRescheduleModal = (bookingId) => {
@@ -228,7 +267,15 @@ function BookingHistory() {
                                     {/* Action Buttons */}
                                     {(wdAllowed || rsAllowed) && (
                                         <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 mt-3">
-                                        {wdAllowed && <button onClick={()=>handleWithdraw(booking._id)} className="px-3 py-1.5 text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition" disabled={actInProgress||thisWdProgress}>{thisWdProgress?<><svg className="animate-spin..."/>Withdrawing...</>:"Withdraw Request"}</button>}
+                                        {wdAllowed && (
+                                            <button
+                                                onClick={() => handleWithdraw(booking)}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                                disabled={actInProgress}
+                                            >
+                                                Withdraw Request
+                                            </button>
+                                        )}
                                         {rsAllowed && <button onClick={()=>openRescheduleModal(booking._id)} disabled={actInProgress} className="px-3 py-1.5 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition">Request Reschedule</button>}
                                         </div>
                                     )}
@@ -282,6 +329,84 @@ function BookingHistory() {
         {/* --- Image Zoom Modal --- */}
         {zoomedImageUrl && ( <div className="fixed inset-0 z-[60] bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setZoomedImageUrl(null)}> <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden"> <img src={zoomedImageUrl} alt="Zoomed Poster" className="block max-w-full max-h-[90vh] object-contain mx-auto my-auto" onClick={(e)=>e.stopPropagation()}/> <button onClick={()=>setZoomedImageUrl(null)} className="absolute top-2 right-2 bg-white/70 hover:bg-white rounded-full p-1"><svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" /></svg></button> </div> </div> )}
 
+        {/* Withdraw Confirmation Modal */}
+        {showWithdrawModal && withdrawBooking && (
+            <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="withdraw-modal" role="dialog" aria-modal="true">
+                <div className="flex items-center justify-center min-h-screen p-4">
+                    {/* Enhanced backdrop with stronger blur effect */}
+                    <div 
+                        className="fixed inset-0 bg-black/40 backdrop-blur-md transition-all duration-300 animate-fade-in-fast" 
+                        onClick={() => setShowWithdrawModal(false)}
+                    ></div>
+
+                    {/* Modal content - Added scale animation and glass effect */}
+                    <div className="relative bg-white/90 backdrop-blur-sm rounded-lg max-w-md w-full shadow-xl animate-modalEnter">
+                        {/* Rest of the modal content remains the same */}
+                        <div className="p-6">
+                            {/* Warning Icon */}
+                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </div>
+
+                            {/* Content */}
+                            <div className="text-center">
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                    Confirm Withdrawal
+                                </h3>
+                                <div className="mt-2 space-y-2">
+                                    <p className="text-sm text-gray-500">
+                                        Are you sure you want to withdraw your booking for:
+                                    </p>
+                                    <p className="text-md font-medium text-gray-800">
+                                        {withdrawBooking.eventName}
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                        {format(parseISO(withdrawBooking.startTime), 'MMM d, yyyy, h:mm a')}
+                                    </p>
+                                    <p className="text-xs text-red-600 mt-2">
+                                        This action cannot be undone.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    onClick={() => setShowWithdrawModal(false)}
+                                    disabled={withdrawingId}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                    onClick={confirmWithdraw}
+                                    disabled={withdrawingId}
+                                >
+                                    {withdrawingId ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Withdrawing...
+                                        </>
+                                    ) : (
+                                        'Withdraw Booking'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div> {/* End Page Container */}
     </div>
   );
@@ -291,8 +416,33 @@ export default BookingHistory;
 
 // Ensure these animations are defined in index.css or global styles
 /*
-@keyframes fadeIn { from{opacity:0; backdrop-filter:blur(0)} to{opacity:1; backdrop-filter:blur(4px)}}
-@keyframes modalEnter { from{transform:scale(0.95);opacity:0} to{transform:scale(1);opacity:1}}
-.animate-fade-in-fast{animation:fadeIn .2s ease-out forwards}
-.animate-modalEnter{animation:modalEnter .3s ease-out forwards}
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(8px);
+    }
+}
+
+.animate-fade-in-fast {
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+@keyframes modalEnter {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.animate-modalEnter {
+    animation: modalEnter 0.3s ease-out forwards;
+}
 */

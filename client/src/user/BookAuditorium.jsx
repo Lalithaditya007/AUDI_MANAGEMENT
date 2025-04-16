@@ -3,20 +3,12 @@ import { useNavigate } from "react-router-dom";
 
 // --- Helper Components ---
 
-function InputField({
-  label,
-  name,
-  type = "text",
-  value,
-  onChange,
-  required = true,
-  disabled = false,
-  min // Add min prop for datetime-local
-}) {
+// Update InputField component for more compact styling
+function InputField({ label, name, type = "text", value, onChange, required = true, disabled = false, min }) {
   return (
     <div>
-      <label htmlFor={name} className="block text-sm font-semibold text-gray-700 mb-1">
-        {label}{required && <span className="text-red-500 ml-1">*</span>}
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+        {label}{required && <span className="text-red-500 ml-0.5 text-xs">*</span>}
       </label>
       <input
         id={name}
@@ -26,8 +18,8 @@ function InputField({
         onChange={onChange}
         required={required}
         disabled={disabled}
-        min={min} // Pass min attribute for datetime-local
-        className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        min={min}
+        className="w-full border border-gray-300 px-3 py-1.5 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-50 disabled:cursor-not-allowed transition-colors"
       />
     </div>
   );
