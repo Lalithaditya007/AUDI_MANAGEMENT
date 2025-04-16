@@ -195,7 +195,7 @@ const AdminDashboard = () => {
   const [trendsError, setTrendsError] = useState("");
   const [trendsDays, setTrendsDays] = useState(30); // Default lookback for overall trends
 
-    const [selectedAudiId, setSelectedAudiId] = useState(''); // Changed from 'all' to empty string
+  const [selectedAudiId, setSelectedAudiId] = useState(''); // Changed from 'all' to empty string
   const [audiTrendData, setAudiTrendData] = useState([]);
   const [isLoadingAudiTrends, setIsLoadingAudiTrends] = useState(false); // Initially false, true when fetching
   const [audiTrendsError, setAudiTrendsError] = useState("");
