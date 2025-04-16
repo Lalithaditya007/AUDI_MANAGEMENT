@@ -31,7 +31,13 @@ function AppContent() {
             <main className="flex-grow">
                 <Routes>
                     {/* Public */}
-                    <Route path="/" element={<Homepage />} /> <Route path="/auditoriums" element={<Auditoriums />} /> <Route path="/ks-auditorium" element={<KSAudi />} /> <Route path="/b-block-seminar-hall" element={<BBlockSeminarHall />} /> <Route path="/peb-hall" element={<PEBHall />} /> <Route path="/apj-auditorium" element={<APJAuditorium />} />
+                    <Route path="/" element={<Homepage />} /> 
+                    <Route path="/auditoriums" element={<Auditoriums />} /> 
+                    <Route path="/ks-auditorium" element={<KSAudi />} /> 
+                    <Route path="/b-block-seminar-hall" element={<BBlockSeminarHall />} />
+                    <Route path="/auditoriums/b-block" element={<BBlockSeminarHall />} />
+                    <Route path="/peb-hall" element={<PEBHall />} /> 
+                    <Route path="/apj-auditorium" element={<APJAuditorium />} />
                     {/* Login */}
                     <Route path="/login" element={isLoggedIn?(userRole==="admin"?<Navigate to="/admin/schedule-viewer"/>:<Navigate to="/book-auditorium"/>):(<Login setIsLoggedIn={setIsLoggedIn} setUserRole={setUserRole} setUserEmail={setUserEmail}/>)} />
                     <Route path="/admin-login" element={<Navigate to="/login" replace />} />
