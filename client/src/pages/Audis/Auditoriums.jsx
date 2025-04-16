@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import KSAudi from "../../assets/ksaudi.jpg";
-import PEB from "../../assets/PEB.jpg";
-import bblock from "../../assets/bblock.jpg";
+import KSAudi from "../../assets/ksaudi/ksaudi1.jpg";
+import PEB from "../../assets/peb/PEB1.jpg";
+import bblock from "../../assets/bblock/bblock1.jpg";
 
 const Auditoriums = () => {
   const auditoriums = [
@@ -17,7 +17,7 @@ const Auditoriums = () => {
       name: "B Block Seminar Hall",
       description: "A spacious seminar hall for academic talks and presentations.",
       capacity: "200 Seats",
-      link: "/bblock",
+      link: "/b-block-seminar-hall", // Changed from "/bblock" to match your route
       image: bblock
     },
     {
