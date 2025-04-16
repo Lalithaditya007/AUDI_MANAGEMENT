@@ -125,52 +125,6 @@ const HomePage = () => {
         </motion.div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
-          >
-            {/* Feature 1 */}
-            <div className="text-center p-6 rounded-xl bg-red-50 hover:bg-red-100 transition-colors duration-300">
-              <div className="text-red-600 mb-4">
-                <svg className="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Modern Facilities</h3>
-              <p className="text-gray-600">State-of-the-art equipment and comfortable seating</p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="text-center p-6 rounded-xl bg-red-50 hover:bg-red-100 transition-colors duration-300">
-              <div className="text-red-600 mb-4">
-                <svg className="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Easy Booking</h3>
-              <p className="text-gray-600">Simple and efficient booking process</p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="text-center p-6 rounded-xl bg-red-50 hover:bg-red-100 transition-colors duration-300">
-              <div className="text-red-600 mb-4">
-                <svg className="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Technical Support</h3>
-              <p className="text-gray-600">Professional support for all events</p>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
       {/* How It Works Section */}
       <section className="py-20 bg-gradient-to-br from-red-50 via-white to-red-50">
         <div className="container mx-auto px-4">
