@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 // --- Helper Components ---
@@ -10,7 +10,8 @@ function InputField({
   value,
   onChange,
   required = true,
-  disabled = false
+  disabled = false,
+  min // Add min prop for datetime-local
 }) {
   return (
     <div>
@@ -25,6 +26,7 @@ function InputField({
         onChange={onChange}
         required={required}
         disabled={disabled}
+        min={min} // Pass min attribute for datetime-local
         className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
       />
     </div>
@@ -60,9 +62,24 @@ function TextAreaField({
 // --- End Helper Components ---
 
 
+// --- Debounce Utility Function ---
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+// --- End Debounce Function ---
+
+
 // --- Main Booking Component ---
 
-function BookAuditorium({ userEmail = "" /* Prop for display only, not used in logic */ }) {
+function BookAuditorium({ userEmail = "" }) {
   const navigate = useNavigate();
 
   // --- State Definitions ---
@@ -72,491 +89,274 @@ function BookAuditorium({ userEmail = "" /* Prop for display only, not used in l
     startTime: "",
     endTime: "",
     auditoriumId: "",
-    departmentId: "", // Added department
-    eventPoster: null, // Holds the File object
+    departmentId: "",
+    eventPoster: null,
   });
-
-  // Data Loading State
   const [auditoriums, setAuditoriums] = useState([]);
   const [isLoadingAuditoriums, setIsLoadingAuditoriums] = useState(false);
   const [auditoriumFetchError, setAuditoriumFetchError] = useState("");
-
   const [departments, setDepartments] = useState([]);
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
   const [departmentFetchError, setDepartmentFetchError] = useState("");
-
-  // Submission/Feedback State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
+  const [isSlotAvailable, setIsSlotAvailable] = useState(true);
+  const [conflictingBookingDetails, setConflictingBookingDetails] = useState(null);
 
   // --- Helper: Show temporary feedback ---
   const showTemporaryFeedback = (setter, message, duration = 5000) => {
     setter(message);
     const timer = setTimeout(() => setter(""), duration);
-    return () => clearTimeout(timer); // Return cleanup function
+    return () => clearTimeout(timer);
   };
 
   // --- Data Fetching Callbacks ---
-
-  /** Fetches the list of available auditoriums. */
   const fetchAuditoriums = useCallback(async () => {
     setIsLoadingAuditoriums(true);
     setAuditoriumFetchError("");
     const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auditoriums`;
     console.log("[API Call] Fetching auditoriums from:", apiUrl);
-
     try {
       const response = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) {
-        let errorMsg = `Auditorium fetch failed (${response.status})`;
-        try {
-          const data = await response.json();
-          errorMsg = data.message || errorMsg;
-        } catch (e) { /* ignore parse error if response not JSON */ }
-        throw new Error(errorMsg);
-      }
-
+      if (!response.ok) { let errorMsg = `Auditorium fetch failed (${response.status})`; try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch (e) { /* ignore */ } throw new Error(errorMsg); }
       const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        setAuditoriums(data.data);
-        // Optional: Set a default selection if needed
-        // if (data.data.length > 0 && !formData.auditoriumId) {
-        //   setFormData(prev => ({...prev, auditoriumId: data.data[0]._id}));
-        // }
-      } else {
-        throw new Error(data.message || "Invalid format received for auditoriums.");
-      }
-    } catch (err) {
-      console.error("Auditorium fetch error:", err);
-      setAuditoriumFetchError(err.message || "Could not load auditorium list.");
-      setAuditoriums([]); // Clear data on error
-    } finally {
-      setIsLoadingAuditoriums(false);
-    }
-  }, []); // Empty dependency array as it doesn't depend on component state/props
+      if (data.success && Array.isArray(data.data)) { setAuditoriums(data.data); }
+      else { throw new Error(data.message || "Invalid format received for auditoriums."); }
+    } catch (err) { console.error("Auditorium fetch error:", err); setAuditoriumFetchError(err.message || "Could not load auditorium list."); setAuditoriums([]); }
+    finally { setIsLoadingAuditoriums(false); }
+  }, []);
 
-  /** Fetches the list of available departments. */
   const fetchDepartments = useCallback(async () => {
     setIsLoadingDepartments(true);
     setDepartmentFetchError("");
     const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/departments`;
     console.log("[API Call] Fetching departments from:", apiUrl);
-
     try {
-      // Assuming public endpoint, add Auth header if needed
       const response = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) {
-        let errorMsg = `Department fetch failed (${response.status})`;
-        try {
-          const data = await response.json();
-          errorMsg = data.message || errorMsg;
-        } catch (e) { /* ignore */ }
-        throw new Error(errorMsg);
-      }
-
+      if (!response.ok) { let errorMsg = `Department fetch failed (${response.status})`; try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch (e) { /* ignore */ } throw new Error(errorMsg); }
       const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        setDepartments(data.data);
-      } else {
-        throw new Error(data.message || "Invalid format received for departments.");
-      }
-    } catch (err) {
-      console.error("Department fetch error:", err);
-      setDepartmentFetchError(err.message || "Could not load department list.");
-      setDepartments([]); // Clear data on error
-    } finally {
-      setIsLoadingDepartments(false);
-    }
-  }, []); // Empty dependency array
+      if (data.success && Array.isArray(data.data)) { setDepartments(data.data); }
+      else { throw new Error(data.message || "Invalid format received for departments."); }
+    } catch (err) { console.error("Department fetch error:", err); setDepartmentFetchError(err.message || "Could not load department list."); setDepartments([]); }
+    finally { setIsLoadingDepartments(false); }
+  }, []);
 
-  // --- Effect Hooks ---
-
-  // Fetch initial dropdown data on component mount
+  // --- Effect Hook for Initial Data ---
   useEffect(() => {
     fetchAuditoriums();
     fetchDepartments();
-  }, [fetchAuditoriums, fetchDepartments]); // Depend on the stable callback functions
+  }, [fetchAuditoriums, fetchDepartments]);
 
   // --- Form Input Handlers ---
-
-  /** Handles changes for standard text/date/select inputs. */
   function handleChange(e) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (['startTime', 'endTime', 'auditoriumId'].includes(name)) {
+        setSubmitError(""); setSuccessMessage("");
+    }
   }
-
-  /** Handles file input changes for the event poster. */
   function handleFileChange(e) {
     const file = e.target.files[0];
-    // Optional: Add file size/type validation here
-    // const maxSize = 5 * 1024 * 1024; // 5MB
-    // const allowedTypes = ['image/png', 'image/jpeg', 'image/gif'];
-    // if (file && file.size > maxSize) { alert('File is too large (Max 5MB)'); return; }
-    // if (file && !allowedTypes.includes(file.type)) { alert('Invalid file type (PNG, JPG, GIF allowed)'); return; }
-
     setFormData((prev) => ({ ...prev, eventPoster: file || null }));
   }
-
-  /** Removes the selected event poster file. */
   function removePoster() {
     setFormData((prev) => ({ ...prev, eventPoster: null }));
-    // Also reset the file input element itself to allow re-uploading the same file
     const fileInput = document.querySelector('input[name="eventPoster"]');
     if (fileInput) fileInput.value = null;
   }
 
+  // --- Availability Check Logic ---
+  const checkSlotAvailability = useCallback(async (auditoriumId, startTimeStr, endTimeStr) => {
+    setIsSlotAvailable(true); setConflictingBookingDetails(null); setAvailabilityError(""); // Reset first
+    if (!auditoriumId || !startTimeStr || !endTimeStr) { return; }
+    let startDateTime, endDateTime;
+    try {
+      startDateTime = new Date(startTimeStr); endDateTime = new Date(endTimeStr);
+      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) throw new Error("Invalid date/time format.");
+      if (startDateTime >= endDateTime) throw new Error("End time must be after start time.");
+    } catch (dateError) { console.warn("Avail check skip:", dateError.message); setAvailabilityError(dateError.message); setIsSlotAvailable(false); return; }
+    const startTimeISO = startDateTime.toISOString(); const endTimeISO = endDateTime.toISOString();
+    console.log(`Checking: Audi=${auditoriumId}, Start=${startTimeISO}, End=${endTimeISO}`);
+    setIsCheckingAvailability(true);
+    try {
+      const token = localStorage.getItem('authToken'); if (!token) throw new Error("Authentication required.");
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/check-availability`;
+      const queryParams = new URLSearchParams({ auditoriumId, startTime: startTimeISO, endTime: endTimeISO });
+      const response = await fetch(`${apiUrl}?${queryParams.toString()}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', }, });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || `Check failed (Status ${response.status})`);
+      setIsSlotAvailable(data.available);
+      if (!data.available && data.conflictingBooking) { setConflictingBookingDetails(data.conflictingBooking); }
+      else { setConflictingBookingDetails(null); }
+       setAvailabilityError(""); // Clear error on success
+    } catch (err) {
+      console.error("Avail check error:", err); setAvailabilityError(err.message || "Could not verify availability."); setIsSlotAvailable(false); setConflictingBookingDetails(null);
+    } finally { setIsCheckingAvailability(false); }
+  }, []);
+
+  const debouncedCheckAvailability = useMemo(() => debounce(checkSlotAvailability, 750), [checkSlotAvailability]);
+
+  useEffect(() => {
+    if (formData.auditoriumId && formData.startTime && formData.endTime) {
+      try {
+        const start = new Date(formData.startTime); const end = new Date(formData.endTime);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start < end) { debouncedCheckAvailability(formData.auditoriumId, formData.startTime, formData.endTime); }
+        else { setIsSlotAvailable(false); setAvailabilityError("Please select a valid start and end time."); setConflictingBookingDetails(null); setIsCheckingAvailability(false); }
+      } catch (e) { console.warn("Date parse useEffect:", e); setIsSlotAvailable(false); setAvailabilityError("Invalid date format."); setConflictingBookingDetails(null); setIsCheckingAvailability(false); }
+    } else { setIsSlotAvailable(true); setConflictingBookingDetails(null); setAvailabilityError(""); setIsCheckingAvailability(false); }
+  }, [formData.auditoriumId, formData.startTime, formData.endTime, debouncedCheckAvailability]);
+
+
   // --- Form Submission Handler ---
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitError("");
-    setSuccessMessage("");
-    setIsSubmitting(true);
-    console.log("[DEBUG] Form submit initiated. Data:", { ...formData, eventPoster: formData.eventPoster?.name }); // Log file name only
-
-    // 1. Authentication Check
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      showTemporaryFeedback(setSubmitError, "Authentication Error: Please log in again.");
-      setIsSubmitting(false);
-      return;
-    }
-    console.log("[DEBUG] Auth token retrieved.");
-
-    // 2. Frontend Basic Validation
-    if (!formData.eventName || !formData.startTime || !formData.endTime || !formData.auditoriumId || !formData.departmentId) {
-      showTemporaryFeedback(setSubmitError, "Please fill in all required fields (marked with *).");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // 3. Date/Time Validation
+    setSubmitError(""); setSuccessMessage("");
+    if (isCheckingAvailability) { showTemporaryFeedback(setSubmitError, "Please wait, checking availability..."); return; }
+    if (!isSlotAvailable) { showTemporaryFeedback(setSubmitError, "Cannot submit: Slot unavailable or input invalid."); return; }
+    if (!formData.eventName || !formData.startTime || !formData.endTime || !formData.auditoriumId || !formData.departmentId) { showTemporaryFeedback(setSubmitError, "Please fill all required fields (*)."); return; }
+    try { const start = new Date(formData.startTime); const end = new Date(formData.endTime); if (isNaN(start.getTime()) || isNaN(end.getTime())) throw new Error("Invalid date."); if (start >= end) throw new Error("End time must be after start."); }
+    catch (validationError) { showTemporaryFeedback(setSubmitError, validationError.message); return; }
+    setIsSubmitting(true); console.log("[DEBUG] Submit initiated.");
+    const token = localStorage.getItem('authToken'); if (!token) { showTemporaryFeedback(setSubmitError, "Auth Error."); setIsSubmitting(false); return; }
+    const formDataToSend = new FormData(); formDataToSend.append('eventName', formData.eventName); formDataToSend.append('description', formData.description); formDataToSend.append('startTime', new Date(formData.startTime).toISOString()); formDataToSend.append('endTime', new Date(formData.endTime).toISOString()); formDataToSend.append('auditorium', formData.auditoriumId); formDataToSend.append('department', formData.departmentId); if (formData.eventPoster) { formDataToSend.append('eventPoster', formData.eventPoster, formData.eventPoster.name); }
+    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings`; console.log("[DEBUG] POST to", apiUrl);
     try {
-      const start = new Date(formData.startTime);
-      const end = new Date(formData.endTime);
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        throw new Error("Invalid date format entered. Please use the date picker.");
-      }
-      if (start >= end) {
-        throw new Error("End time must be strictly after the start time.");
-      }
-      // Optional: Add frontend validation for lead time (e.g., must be X hours in future)
-      // const minBookingTime = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
-      // if (start < minBookingTime) {
-      //   throw new Error("Booking must be made at least 2 hours in advance.");
-      // }
-    } catch (validationError) {
-      showTemporaryFeedback(setSubmitError, validationError.message);
-      setIsSubmitting(false);
-      return;
-    }
-    console.log("[DEBUG] Frontend validation passed.");
-
-    // 4. Prepare FormData for multipart request
-    const formDataToSend = new FormData();
-    formDataToSend.append('eventName', formData.eventName);
-    formDataToSend.append('description', formData.description);
-    formDataToSend.append('startTime', new Date(formData.startTime).toISOString()); // Send ISO string for backend consistency
-    formDataToSend.append('endTime', new Date(formData.endTime).toISOString());
-    formDataToSend.append('auditorium', formData.auditoriumId); // Key matches backend `req.body.auditorium`
-    formDataToSend.append('department', formData.departmentId); // Key matches backend `req.body.department`
-    if (formData.eventPoster) {
-      formDataToSend.append('eventPoster', formData.eventPoster, formData.eventPoster.name); // 'eventPoster' matches backend field
-      console.log("[DEBUG] Appending file to FormData:", formData.eventPoster.name);
-    } else {
-      console.log("[DEBUG] No file appended to FormData.");
-    }
-
-    // 5. Make Fetch POST Request
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings`;
-    console.log("[DEBUG] Sending POST to", apiUrl);
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          // ** DO NOT set 'Content-Type' header manually for FormData **
-          // Browser sets it automatically with the correct boundary
-          "Authorization": `Bearer ${token}`,
-          "Accept": "application/json", // We expect JSON response back
-        },
-        body: formDataToSend,
-      });
-
-      // 6. Handle Response
-      let responseData;
-      const contentType = response.headers.get("content-type");
-
-      if (contentType && contentType.includes("application/json")) {
-        responseData = await response.json();
-      } else {
-        // Handle non-JSON responses (e.g., plain text errors, HTML error pages)
-        const textResponse = await response.text();
-        console.warn("[DEBUG] Received non-JSON response:", response.status, textResponse.substring(0, 200)); // Log snippet
-        if (!response.ok) {
-          // Use the text as message if available, otherwise generic status error
-          throw new Error(textResponse || `Server responded with status ${response.status}`);
-        } else {
-          // Successful status code but unexpected non-JSON response
-          responseData = { success: true, message: 'Booking submitted (received non-JSON success response).', data: null };
-        }
-      }
-
-      console.log("[DEBUG] Backend response status:", response.status);
-      console.log("[DEBUG] Backend response data:", responseData);
-
-      if (!response.ok || !responseData.success) {
-        // Use the message from JSON if available, otherwise throw generic error
-        throw new Error(responseData.message || `Booking submission failed.`);
-      }
-
-      // --- Success ---
-      const successMsg = responseData.message || "Booking request submitted successfully!";
-      showTemporaryFeedback(setSuccessMessage, successMsg, 7000); // Show success message longer
-      console.log("[SUCCESS] Booking submitted:", responseData.data?._id);
-
-      // Reset form fully
-      setFormData({
-        eventName: "", description: "", startTime: "", endTime: "",
-        auditoriumId: "", departmentId: "", eventPoster: null
-      });
-      removePoster(); // Ensure file input UI is also cleared
-
-      // Optional: Navigate user after successful booking
-      // navigate('/my-bookings'); // Example navigation
-
+      const response = await fetch(apiUrl, { method: "POST", headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json", }, body: formDataToSend, });
+      let responseData; const contentType = response.headers.get("content-type"); if (contentType?.includes("application/json")) { responseData = await response.json(); } else { const text = await response.text(); if (!response.ok) throw new Error(text || `Server error ${response.status}`); else responseData = { success: true, message: 'Success (non-JSON).', data: null }; }
+      if (!response.ok || !responseData.success) throw new Error(responseData.message || `Submit failed.`);
+      const successMsg = responseData.message || "Booking submitted!"; showTemporaryFeedback(setSuccessMessage, successMsg, 7000);
+      setFormData({ eventName: "", description: "", startTime: "", endTime: "", auditoriumId: "", departmentId: "", eventPoster: null }); removePoster();
+      setIsSlotAvailable(true); setAvailabilityError(""); setConflictingBookingDetails(null); // Reset check state
     } catch (err) {
-      console.error("Booking submission process error:", err);
-      // Display the specific error message caught
-      showTemporaryFeedback(setSubmitError, err.message || "An error occurred. Please check details and try again.");
-    } finally {
-      setIsSubmitting(false);
-      console.log("[DEBUG] Submission process finished.");
-    }
+      console.error("Submit error:", err);
+      if (err.message?.toLowerCase().includes("conflict") || err.message?.toLowerCase().includes("overlaps")) { setSubmitError("Submit failed: Slot already booked."); setIsSlotAvailable(false); }
+      else { setSubmitError(err.message || "Error submitting."); }
+    } finally { setIsSubmitting(false); console.log("[DEBUG] Submit finished."); }
   } // --- End handleSubmit ---
 
+  const getMinDateTimeLocal = () => {
+      const now = new Date(); const minDate = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // 2 hours ahead
+      const offset = minDate.getTimezoneOffset() * 60000; const localISOTime = new Date(minDate.getTime() - offset).toISOString().slice(0, 16); return localISOTime;
+  };
 
   // --- Render Component UI ---
   return (
     <>
-      {/* Background Container */}
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 py-10 sm:py-16 px-4 sm:px-6 lg:px-8">
-        {/* Form Card */}
         <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
-          {/* Card Header */}
           <div className="bg-red-700 p-4 sm:p-6 text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-              Auditorium Booking Request Form
-            </h2>
-            <p className="text-sm text-red-100 mt-1">
-              Fields marked with <span className="text-yellow-300 font-bold">*</span> are required.
-            </p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight"> Auditorium Booking Request Form </h2>
+            <p className="text-sm text-red-100 mt-1"> Fields marked with <span className="text-yellow-300 font-bold">*</span> are required. </p>
           </div>
-
-          {/* Form Area with Padding */}
           <div className="p-6 sm:p-10">
-            {/* Feedback Messages */}
-            {submitError && (
-              <div className="mb-6 p-3 text-center text-sm font-medium text-red-800 bg-red-100 rounded-md border border-red-200 shadow-sm transition duration-300 ease-in-out" role="alert">
-                {submitError}
-              </div>
-            )}
-            {successMessage && (
-              <div className="mb-6 p-3 text-center text-sm font-medium text-green-800 bg-green-100 rounded-md border border-green-200 shadow-sm transition duration-300 ease-in-out" role="alert">
-                {successMessage}
-              </div>
-            )}
-            {/* End Feedback */}
-
-            {/* Form Element */}
+            {submitError && ( <div className="mb-6 p-3 text-center text-sm font-medium text-red-800 bg-red-100 rounded-md border border-red-200 shadow-sm" role="alert">{submitError}</div> )}
+            {successMessage && ( <div className="mb-6 p-3 text-center text-sm font-medium text-green-800 bg-green-100 rounded-md border border-green-200 shadow-sm" role="alert">{successMessage}</div> )}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Event Name Input */}
-              <InputField
-                label="Event Name"
-                name="eventName"
-                value={formData.eventName}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                required={true}
-              />
-
-              {/* Department Select Dropdown */}
-              <div>
-                <label htmlFor="departmentId" className="block text-sm font-semibold text-gray-700 mb-1">
-                  Organizing Department <span className="text-red-500 ml-1">*</span>
-                </label>
-                <select
-                  id="departmentId"
-                  name="departmentId"
-                  value={formData.departmentId}
-                  onChange={handleChange}
-                  required
-                  className={`w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-400 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed ${departmentFetchError ? 'border-red-500' : 'border-gray-300'}`}
-                  disabled={isLoadingDepartments || !!departmentFetchError || departments.length === 0 || isSubmitting}
-                >
-                  <option value="" disabled>
-                    {isLoadingDepartments ? "Loading Departments..." :
-                      departmentFetchError ? "Error Loading Departments" :
-                        departments.length === 0 ? "No Departments Available" :
-                          "-- Select Department --"}
-                  </option>
-                  {!isLoadingDepartments && !departmentFetchError && departments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
-                      {dept.name} {dept.code ? `(${dept.code})` : ''}
-                    </option>
-                  ))}
+              <InputField label="Event Name" name="eventName" value={formData.eventName} onChange={handleChange} disabled={isSubmitting} required={true} />
+              <div> {/* Department Select */}
+                <label htmlFor="departmentId" className="block text-sm font-semibold text-gray-700 mb-1"> Organizing Department <span className="text-red-500 ml-1">*</span> </label>
+                <select id="departmentId" name="departmentId" value={formData.departmentId} onChange={handleChange} required className={`w-full border px-3 py-2 rounded ... ${departmentFetchError ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoadingDepartments || !!departmentFetchError || departments.length === 0 || isSubmitting}>
+                  <option value="" disabled> {isLoadingDepartments ? "Loading..." : departmentFetchError ? "Error Loading" : departments.length === 0 ? "No Depts" : "-- Select --"} </option>
+                  {!isLoadingDepartments && !departmentFetchError && departments.map((dept) => (<option key={dept._id} value={dept._id}>{dept.name} {dept.code ? `(${dept.code})` : ''}</option>))}
                 </select>
                 {departmentFetchError && <p className="text-red-600 text-xs mt-1">{departmentFetchError}</p>}
               </div>
-              {/* End Department Select */}
-
-              {/* Auditorium Select Dropdown */}
-              <div>
-                <label htmlFor="auditoriumId" className="block text-sm font-semibold text-gray-700 mb-1">
-                  Auditorium <span className="text-red-500 ml-1">*</span>
-                </label>
-                <select
-                  id="auditoriumId"
-                  name="auditoriumId"
-                  value={formData.auditoriumId}
-                  onChange={handleChange}
-                  required
-                  className={`w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-400 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed ${auditoriumFetchError ? 'border-red-500' : 'border-gray-300'}`}
-                  disabled={isLoadingAuditoriums || !!auditoriumFetchError || auditoriums.length === 0 || isSubmitting}
-                >
-                  <option value="" disabled>
-                    {isLoadingAuditoriums ? "Loading Auditoriums..." :
-                      auditoriumFetchError ? "Error Loading Auditoriums" :
-                        auditoriums.length === 0 ? "No Auditoriums Available" :
-                          "-- Select Auditorium --"}
-                  </option>
-                  {!isLoadingAuditoriums && !auditoriumFetchError && auditoriums.map((audi) => (
-                    <option key={audi._id} value={audi._id}>
-                      {audi.name} ({audi.location || 'N/A'}) - Cap: {audi.capacity || '?'}
-                    </option>
-                  ))}
+              <div> {/* Auditorium Select */}
+                <label htmlFor="auditoriumId" className="block text-sm font-semibold text-gray-700 mb-1"> Auditorium <span className="text-red-500 ml-1">*</span> </label>
+                <select id="auditoriumId" name="auditoriumId" value={formData.auditoriumId} onChange={handleChange} required className={`w-full border px-3 py-2 rounded ... ${auditoriumFetchError ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoadingAuditoriums || !!auditoriumFetchError || auditoriums.length === 0 || isSubmitting}>
+                  <option value="" disabled> {isLoadingAuditoriums ? "Loading..." : auditoriumFetchError ? "Error Loading" : auditoriums.length === 0 ? "No Audis" : "-- Select --"} </option>
+                  {!isLoadingAuditoriums && !auditoriumFetchError && auditoriums.map((audi) => (<option key={audi._id} value={audi._id}>{audi.name} ({audi.location || 'N/A'}) - Cap: {audi.capacity || '?'}</option>))}
                 </select>
                 {auditoriumFetchError && <p className="text-red-600 text-xs mt-1">{auditoriumFetchError}</p>}
               </div>
-              {/* End Auditorium Select */}
-
-              {/* Event Description Text Area */}
-              <TextAreaField
-                label="Event Description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                required={false} // Description is optional
-              />
-
-              {/* Start/End Date & Time Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <InputField
-                  label="Start Date & Time"
-                  name="startTime"
-                  type="datetime-local"
-                  value={formData.startTime}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  required={true}
-                />
-                <InputField
-                  label="End Date & Time"
-                  name="endTime"
-                  type="datetime-local"
-                  value={formData.endTime}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  required={true}
-                />
+              <TextAreaField label="Event Description" name="description" value={formData.description} onChange={handleChange} disabled={isSubmitting} required={false} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"> {/* Date Inputs */}
+                 <InputField label="Start Date & Time" name="startTime" type="datetime-local" value={formData.startTime} onChange={handleChange} disabled={isSubmitting} required={true} min={getMinDateTimeLocal()} />
+                 <InputField label="End Date & Time" name="endTime" type="datetime-local" value={formData.endTime} onChange={handleChange} disabled={isSubmitting} required={true} min={formData.startTime || getMinDateTimeLocal()} />
               </div>
 
-              {/* Event Poster File Input Area */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Event Poster (Optional, Max 5MB, Image files only)
-                </label>
-                {!formData.eventPoster ? (
-                  // Display file input drop zone
-                  <div className="relative w-full h-36 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition duration-150 flex items-center justify-center cursor-pointer group">
-                    <div className="text-center pointer-events-none">
-                      <svg className="mx-auto h-10 w-10 text-gray-400 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                      </svg>
-                      <p className="text-sm text-gray-500 group-hover:text-gray-600 mt-1">Click or drag image here</p>
-                      <p className="text-xs text-gray-400 group-hover:text-gray-500">PNG, JPG, GIF up to 5MB</p>
+              {/* Availability Feedback - Reduced spacing */}
+              <div className="min-h-[24px] text-sm"> {/* Reduced min-height */}
+                {isCheckingAvailability && (
+                  <p className="text-gray-500 italic flex items-center animate-pulse">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Checking availability...
+                  </p>
+                )}
+                {!isCheckingAvailability && availabilityError && (
+                  <p className="text-red-600 font-semibold">{availabilityError}</p>
+                )}
+                {!isCheckingAvailability && !availabilityError && !isSlotAvailable && conflictingBookingDetails && (
+                  <div className="text-yellow-800 bg-yellow-50 p-3 rounded-md border border-yellow-200">
+                    <p className="font-bold mb-1">Slot Unavailable</p>
+                    <div className="text-sm space-y-1">
+                      <p>Conflicts with event: <span className="font-semibold">"{conflictingBookingDetails.eventName}"</span></p>
+                      <p>Organized by: <span className="font-semibold">{conflictingBookingDetails.department || 'N/A'}</span></p>
+                      <p>Timing: <span className="font-semibold">
+                        {new Date(conflictingBookingDetails.startTime).toLocaleString('en-US', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short'
+                        })}
+                        {' - '}
+                        {new Date(conflictingBookingDetails.endTime).toLocaleString('en-US', {
+                          timeStyle: 'short'
+                        })}
+                      </span></p>
                     </div>
-                    {/* Actual file input is hidden but covers the area */}
-                    <input
-                      type="file"
-                      name="eventPoster"
-                      accept="image/png, image/jpeg, image/gif"
-                      onChange={handleFileChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      disabled={isSubmitting}
-                    />
+                  </div>
+                )}
+                {!isCheckingAvailability && !availabilityError && isSlotAvailable && formData.auditoriumId && formData.startTime && formData.endTime && (new Date(formData.startTime) < new Date(formData.endTime)) && (
+                  <p className="text-green-700 font-semibold flex items-center">
+                    <svg className="w-4 h-4 mr-1.5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                    Time slot appears available.
+                  </p>
+                )}
+              </div>
+
+              {/* Event Poster - Always visible */}
+              <div className="mt-4"> {/* Event Poster */}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Poster (Optional, Max 5MB)</label>
+                {!formData.eventPoster ? (
+                  <div className="relative group w-full h-36 border-2 border-dashed rounded-lg border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-100">
+                    <div className="text-center pointer-events-none">
+                      <p className="text-gray-500">Click or drag to upload poster</p>
+                    </div>
+                    <input type="file" name="eventPoster" accept="image/png, image/jpeg, image/gif" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" disabled={isSubmitting} />
                   </div>
                 ) : (
-                  // Display image preview and remove button
-                  <div className="relative mt-2 group w-48 h-48 sm:w-56 sm:h-56 mx-auto sm:mx-0">
-                    {/* Preview using Object URL */}
-                    <img
-                      src={URL.createObjectURL(formData.eventPoster)}
-                      alt="Poster Preview"
-                      className="w-full h-full object-cover border border-gray-300 rounded-lg shadow"
-                      // Revoke object URL after load to free memory (browser caches it)
-                      onLoad={(e) => URL.revokeObjectURL(e.target.src)}
-                    />
-                    <button
-                      type="button" // Important: Prevent form submission
-                      onClick={removePoster}
-                      disabled={isSubmitting}
-                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1.5 leading-none shadow-md opacity-70 group-hover:opacity-100 transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 disabled:opacity-50"
-                      title="Remove Poster"
-                      aria-label="Remove Poster"
-                    >
-                      {/* Close Icon */}
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path>
-                      </svg>
+                  <div className="relative mt-2 group w-48 h-48 sm:w-56 sm:h-56">
+                    <img src={URL.createObjectURL(formData.eventPoster)} alt="Preview" className="w-full h-full object-cover rounded-lg" onLoad={(e) => URL.revokeObjectURL(e.target.src)}/>
+                    <button type="button" onClick={removePoster} disabled={isSubmitting} className="absolute -top-2 -right-2 bg-red-100 rounded-full p-1 hover:bg-red-200">
+                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                   </div>
                 )}
               </div>
-              {/* End Event Poster */}
 
-              {/* Submit Button Area */}
-              <div className="pt-6 border-t border-gray-200 text-center">
-                <button
-                  type="submit"
-                  // Disable button if essential data is loading, or already submitting
-                  disabled={isSubmitting || isLoadingAuditoriums || isLoadingDepartments || !!auditoriumFetchError || !!departmentFetchError}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3 text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-300 rounded-lg text-lg font-semibold transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-                >
-                  {isSubmitting ? (
-                    <>
-                      {/* Loading Spinner */}
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Booking Request"
-                  )}
-                </button>
-              </div>
-              {/* End Submit Button */}
-            </form>
-            {/* End Form Element */}
+               <div className="pt-6 border-t border-gray-200 text-center"> {/* Submit Button */}
+                 <button
+                   type="submit"
+                   disabled={ // Final check on disabled logic
+                       !isSlotAvailable || isCheckingAvailability || isSubmitting ||
+                       isLoadingAuditoriums || isLoadingDepartments ||
+                       !!auditoriumFetchError || !!departmentFetchError ||
+                       !formData.auditoriumId || !formData.departmentId ||
+                       !formData.startTime || !formData.endTime ||
+                       // Also disable if the input times are known to be invalid
+                       (formData.startTime && formData.endTime && new Date(formData.startTime) >= new Date(formData.endTime))
+                   }
+                   className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3 text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-300 rounded-lg text-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ..."
+                 >
+                   {isSubmitting ? (<>{/* Spinner */} Submitting...</> ) : ( "Submit Booking Request" )}
+                 </button>
+               </div>
+             </form>
           </div>
-          {/* End Form Area */}
         </div>
-        {/* End Form Card */}
       </div>
-      {/* End Background Container */}
     </>
   );
 }
