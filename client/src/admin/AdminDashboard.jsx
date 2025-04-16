@@ -195,13 +195,13 @@ const AdminDashboard = () => {
   const [trendsError, setTrendsError] = useState("");
   const [trendsDays, setTrendsDays] = useState(30); // Default lookback for overall trends
 
-  const [selectedAudiId, setSelectedAudiId] = useState('all'); // Specific trend filters
+    const [selectedAudiId, setSelectedAudiId] = useState(''); // Changed from 'all' to empty string
   const [audiTrendData, setAudiTrendData] = useState([]);
   const [isLoadingAudiTrends, setIsLoadingAudiTrends] = useState(false); // Initially false, true when fetching
   const [audiTrendsError, setAudiTrendsError] = useState("");
   const [audiTrendsDays, setAudiTrendsDays] = useState(30); // Lookback for auditorium trends
 
-  const [selectedDeptId, setSelectedDeptId] = useState('all');
+  const [selectedDeptId, setSelectedDeptId] = useState(''); // Changed from 'all' to empty string
   const [deptTrendData, setDeptTrendData] = useState([]);
   const [isLoadingDeptTrends, setIsLoadingDeptTrends] = useState(false); // Initially false
   const [deptTrendsError, setDeptTrendsError] = useState("");
@@ -373,11 +373,31 @@ const AdminDashboard = () => {
 
   }, [fetchData, upcomingDays, trendsDays]); // Dependencies: Re-run if these change
 
+  // Add this effect after the initial data fetch effect to set default selections
+  useEffect(() => {
+    if (!isLoadingDropdowns && auditoriums.length > 0 && departments.length > 0) {
+      // Find KS Auditorium
+      const ksAudi = auditoriums.find(a => 
+        a.name.toLowerCase().includes('ks') || 
+        a.name.toLowerCase().includes('kode satyanarayana')
+      );
+      
+      // Find IT Department
+      const itDept = departments.find(d => 
+        d.name.toLowerCase().includes('information technology') || 
+        d.name.toLowerCase().includes('it')
+      );
+
+      // Set defaults if found
+      if (ksAudi && !selectedAudiId) setSelectedAudiId(ksAudi._id);
+      if (itDept && !selectedDeptId) setSelectedDeptId(itDept._id);
+    }
+  }, [auditoriums, departments, isLoadingDropdowns]);
 
   // Effect 2: Fetch Auditorium Specific Trends
   useEffect(() => {
     // Don't fetch if 'all' is selected or not logged in as admin
-    if (selectedAudiId === 'all') {
+    if (selectedAudiId === '') {
       setAudiTrendData([]); // Clear data if switching back to 'all'
       setIsLoadingAudiTrends(false);
       setAudiTrendsError("");
@@ -430,7 +450,7 @@ const AdminDashboard = () => {
 
   // Effect 3: Fetch Department Specific Trends
   useEffect(() => {
-    if (selectedDeptId === 'all') {
+    if (selectedDeptId === '') {
       setDeptTrendData([]);
       setIsLoadingDeptTrends(false);
       setDeptTrendsError("");
@@ -733,7 +753,7 @@ const AdminDashboard = () => {
                 xAxisDataKey="date"
                 lineDataKey="count"
                 lineColor="#82ca9d" // Green
-                emptyMessage={selectedAudiId === 'all' ? "Select an auditorium to view trends" : `No request data found for this auditorium.`}
+                emptyMessage={selectedAudiId === '' ? "Select an auditorium to view trends" : `No request data found for this auditorium.`}
                 periodButtons={true}
                 currentPeriod={audiTrendsDays}
                 onPeriodChange={setAudiTrendsDays}
@@ -745,7 +765,7 @@ const AdminDashboard = () => {
                     disabled={isLoadingDropdowns || auditoriums.length === 0}
                     aria-label="Select Auditorium for Trends"
                   >
-                    <option value="all">-- Select Auditorium --</option>
+                    <option value="">-- Select Auditorium --</option>
                     {isLoadingDropdowns && <option disabled>Loading...</option>}
                     {!isLoadingDropdowns && auditoriums.map(a => (
                       <option key={a._id} value={a._id}>{a.name}</option>
@@ -762,7 +782,7 @@ const AdminDashboard = () => {
                 xAxisDataKey="date"
                 lineDataKey="count"
                 lineColor="#ffc658" // Orange/Yellow
-                emptyMessage={selectedDeptId === 'all' ? "Select a department to view trends" : `No request data found for this department.`}
+                emptyMessage={selectedDeptId === '' ? "Select a department to view trends" : `No request data found for this department.`}
                 periodButtons={true}
                 currentPeriod={deptTrendsDays}
                 onPeriodChange={setDeptTrendsDays}
@@ -774,7 +794,7 @@ const AdminDashboard = () => {
                     disabled={isLoadingDropdowns || departments.length === 0}
                     aria-label="Select Department for Trends"
                   >
-                    <option value="all">-- Select Department --</option>
+                    <option value="">-- Select Department --</option>
                     {isLoadingDropdowns && <option disabled>Loading...</option>}
                     {!isLoadingDropdowns && departments.map(d => (
                       <option key={d._id} value={d._id}>{d.name}</option>
