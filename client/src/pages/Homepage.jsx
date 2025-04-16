@@ -1,9 +1,9 @@
 import React from 'react';
-import Events from '../components/events.jsx';
+import Events from '../components/Events.jsx';
 import clg from '../assets/clg.jpg';
-import ksaudi from '../assets/ksaudi.jpg';
-import bblock from '../assets/bblock.jpg';
-import PEB from '../assets/PEB.jpg';
+import ksaudi from '../assets/ksaudi/ksaudi1.jpg';
+import bblock from '../assets/bblock/bblock1.jpg';
+import PEB from '../assets/peb/peb1.jpg';
 import { motion } from 'framer-motion';
 
 const HomePage = () => {
