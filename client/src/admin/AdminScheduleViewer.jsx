@@ -80,97 +80,148 @@ function AdminScheduleViewer() {
 
     // --- Render ---
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto"> {/* Increased max-width */}
-            <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800">Auditorium Schedule</h1>
-            {fetchError && <div className="mb-4 p-3 text-center text-sm text-red-800 bg-red-100 rounded border border-red-200">{fetchError}</div>}
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 md:p-6">
+            <div className="max-w-6xl mx-auto">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">
+                        Auditorium Schedule
+                    </h1>
+                    
+                    {/* Auditorium Selector */}
+                    <div className="w-full sm:w-72">
+                        <select 
+                            value={selectedAuditoriumId}
+                            onChange={handleAuditoriumChange}
+                            disabled={isLoadingAudis || isLoadingSchedule}
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <option value="" disabled={!!selectedAuditoriumId}>
+                                {isLoadingAudis ? 'Loading auditoriums...' : '-- Select Auditorium --'}
+                            </option>
+                            {auditoriums.map(a => (
+                                <option key={a._id} value={a._id}>
+                                    {a.name}{a.location ? ` (${a.location})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
 
-            {/* --- Selection Bar --- */}
-            <div className="mb-6 p-4 bg-white rounded-lg shadow-md flex flex-col sm:flex-row items-center gap-4 sticky top-4 z-10 backdrop-blur-sm bg-opacity-90"> {/* Added sticky */}
-                 <div className="flex-1 w-full sm:min-w-[250px]">
-                    <label htmlFor="auditorium-select" className="block text-sm font-medium text-gray-700 mb-1">Auditorium:</label>
-                    <select id="auditorium-select" value={selectedAuditoriumId} onChange={handleAuditoriumChange} disabled={isLoadingAudis || isLoadingSchedule} className="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed">
-                        <option value="" disabled={!!selectedAuditoriumId}>{isLoadingAudis ? 'Loading...' : '-- Select Auditorium --'}</option>
-                        {auditoriums.map(a => (<option key={a._id} value={a._id}>{a.name}{a.location ? ` (${a.location})` : ''}</option>))}
-                    </select>
-                 </div>
-                 <div className="flex items-center gap-2 justify-center w-full sm:w-auto pt-2 sm:pt-0">
-                    <button onClick={() => changeMonth('prev')} className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Previous month" disabled={isLoadingSchedule}>
-                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <span className="font-semibold text-lg text-gray-700 w-36 text-center tabular-nums"> {/* Fixed width for stability */}
-                       {format(currentMonthDate, 'MMMM yyyy')}
-                     </span>
-                    <button onClick={() => changeMonth('next')} className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Next month" disabled={isLoadingSchedule}>
-                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                 </div>
-             </div>
+                {/* Error Message */}
+                {fetchError && (
+                    <div className="mb-6 p-3 text-sm text-red-800 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                        {fetchError}
+                    </div>
+                )}
 
-            {/* Calendar and Schedule Details Grid */}
-             <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-                {/* Calendar */}
-                 <div className="lg:col-span-5 bg-white p-2 sm:p-4 rounded-lg shadow overflow-hidden">
-                     {isLoadingSchedule && <div className="min-h-[350px] flex items-center justify-center"><p className="animate-pulse text-gray-500">Loading Schedule...</p></div>}
-                     {!isLoadingSchedule && selectedAuditoriumId && (
-                        <Calendar
-                             value={currentMonthDate} // Keeps calendar showing selected month view
-                             onClickDay={handleDateClick} // Action on clicking a day
-                             onActiveStartDateChange={({ activeStartDate }) => setCurrentMonthDate(activeStartDate)} // Update state on internal navigation
-                             tileClassName={tileClassName} // Custom CSS classes per day
-                             className="react-calendar-custom" // Base class for custom CSS rules
-                             showNeighboringMonth={false} // Simplify view to current month only
-                         />
-                      )}
-                      {!isLoadingSchedule && selectedAuditoriumId && (
-                        <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2">Calendar Legend</h4>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
-                                    <span className="text-gray-600">Single Day Event</span>
+                {/* Month Navigator */}
+                <div className="bg-white rounded-lg shadow-sm mb-6 p-4 sticky top-4 z-20 backdrop-blur-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={() => changeMonth('prev')}
+                            className="p-2 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                            disabled={isLoadingSchedule}
+                        >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <h2 className="text-lg font-semibold text-gray-800">
+                            {format(currentMonthDate, 'MMMM yyyy')}
+                        </h2>
+                        <button
+                            onClick={() => changeMonth('next')}
+                            className="p-2 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                            disabled={isLoadingSchedule}
+                        >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Calendar Section */}
+                    <div className="lg:col-span-2">
+                        <div className="bg-white rounded-lg shadow-sm p-4 overflow-hidden">
+                            {isLoadingSchedule && (
+                                <div className="min-h-[400px] flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-4 rounded-l-full bg-red-100 border border-red-200"></div>
-                                    <span className="text-gray-600">Event Start</span>
+                            )}
+                            {!isLoadingSchedule && selectedAuditoriumId && (
+                                <Calendar
+                                    value={currentMonthDate}
+                                    onClickDay={handleDateClick}
+                                    onActiveStartDateChange={({ activeStartDate }) => setCurrentMonthDate(activeStartDate)}
+                                    tileClassName={tileClassName}
+                                    className="react-calendar-custom"
+                                    showNeighboringMonth={false}
+                                />
+                            )}
+                            {!selectedAuditoriumId && (
+                                <div className="min-h-[400px] flex items-center justify-center text-gray-500">
+                                    Please select an auditorium to view its schedule
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-4 bg-red-50 border-t border-b border-red-200"></div>
-                                    <span className="text-gray-600">Event Middle</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-4 rounded-r-full bg-red-100 border border-red-200"></div>
-                                    <span className="text-gray-600">Event End</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
-                      )}
-                     {!selectedAuditoriumId && <div className="min-h-[350px] flex items-center justify-center"><p className="text-gray-500">Select an auditorium to view its schedule.</p></div>}
-                 </div>
+                    </div>
 
-                 {/* Schedule List for Selected Date */}
-                 <div className="lg:col-span-2 bg-white border border-gray-200 p-4 rounded-lg shadow min-h-[400px]"> {/* Changed bg, added border */}
-                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 border-b border-gray-200 pb-2">
-                        {selectedDate ? `Schedule for ${format(selectedDate, 'EEE, MMM d')}` : 'Select a Date'}
-                     </h3>
-                     {isLoadingSchedule && <p className="text-sm text-gray-500">Loading...</p>}
-                     {!isLoadingSchedule && selectedDate && selectedDateBookings.length === 0 && (<p className="text-sm text-gray-500 italic">No bookings scheduled for this date.</p>)}
-                     {!isLoadingSchedule && selectedDateBookings.length > 0 && (
-                         <ul className="space-y-3 overflow-y-auto max-h-[calc(100% - 60px)]"> {/* Adjusted max-h */}
-                             {selectedDateBookings.map(booking => (
-                                 <li key={booking._id} className="p-2.5 bg-red-50 border border-red-100 rounded-md"> {/* Changed bg */}
-                                     <p className="font-medium text-sm text-red-800 truncate">{booking.eventName || 'Untitled Event'}</p>
-                                      <div className="text-xs text-red-700 mt-0.5"> {/* Consistent color */}
-                                          <p><span className="font-semibold">From:</span> {format(parseISO(booking.startTime), 'MMM d, h:mm a')}</p>
-                                          <p><span className="font-semibold">To: </span> {format(parseISO(booking.endTime), 'MMM d, h:mm a')}</p>
-                                      </div>
-                                     {booking.user && <p className="text-xs text-gray-500 mt-1">By: {booking.user.username || booking.user.email || 'N/A'}</p>}
-                                  </li>
-                             ))}
-                         </ul>
-                     )}
-                 </div>
-             </div>
-         </div>
+                    {/* Events List Section */}
+                    <div className="bg-white rounded-lg shadow-sm p-4 min-h-[400px]">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">
+                            {selectedDate ? format(selectedDate, 'EEEE, MMMM d') : 'Select a Date'}
+                        </h3>
+                        
+                        {isLoadingSchedule && (
+                            <div className="flex items-center justify-center h-32">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500"></div>
+                            </div>
+                        )}
+                        
+                        {!isLoadingSchedule && selectedDate && selectedDateBookings.length === 0 && (
+                            <p className="text-sm text-gray-500 italic text-center">
+                                No events scheduled for this date
+                            </p>
+                        )}
+                        
+                        {!isLoadingSchedule && selectedDateBookings.length > 0 && (
+                            <ul className="space-y-3 overflow-y-auto max-h-[calc(100vh-300px)]">
+                                {selectedDateBookings.map(booking => (
+                                    <li key={booking._id} 
+                                        className="p-3 bg-gradient-to-r from-red-50 to-white border border-red-100 rounded-lg hover:shadow-sm transition-shadow">
+                                        <p className="font-medium text-gray-900 truncate">
+                                            {booking.eventName || 'Untitled Event'}
+                                        </p>
+                                        <div className="mt-2 space-y-1 text-sm text-gray-600">
+                                            <p className="flex items-center">
+                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                {format(parseISO(booking.startTime), 'h:mm a')} - {format(parseISO(booking.endTime), 'h:mm a')}
+                                            </p>
+                                            {booking.user && (
+                                                <p className="flex items-center text-gray-500">
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                    </svg>
+                                                    {booking.user.username || booking.user.email || 'N/A'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 

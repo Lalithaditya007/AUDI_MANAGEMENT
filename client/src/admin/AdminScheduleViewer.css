@@ -10,6 +10,26 @@
   font-size: 0.875rem; /* text-sm */
   line-height: 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  background: white;
+  font-family: inherit;
+  line-height: 1.125em;
+}
+
+.react-calendar-custom button {
+  padding: 8px;
+  background: none;
+  border: 0;
+  outline: none;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.react-calendar-custom button:enabled:hover {
+  background-color: #f3f4f6;
+  border-radius: 8px;
 }
 
 /* --- Navigation --- */
@@ -65,15 +85,22 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.25rem;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 0.8em;
+  color: #6b7280;
 }
 
 .react-calendar-custom .react-calendar__month-view__weekdays__weekday {
   padding-bottom: 0.25rem;
+  padding: 0.5em;
 }
 
 .react-calendar-custom .react-calendar__month-view__weekdays__weekday abbr {
   text-decoration: none;
   cursor: default;
+  text-decoration: none;
 }
 
 /* --- Day Tiles --- */
@@ -110,6 +137,7 @@
 /* Other Month Tiles (neighboring days) */
 .react-calendar-custom .react-calendar__month-view__days__day--neighboringMonth {
   color: #d1d5db; /* gray-300 */
+  color: #9ca3af;
 }
 
 .react-calendar-custom .react-calendar__month-view__days__day--neighboringMonth:disabled {
@@ -133,6 +161,7 @@
   background: #dc2626 !important; /* red-600 */
   color: white !important;
   font-weight: 600;
+  border-radius: 8px;
 }
 
 .react-calendar-custom .react-calendar__tile.selected-day:enabled:hover {
@@ -156,6 +185,10 @@
 .booking-single-day {
   background-color: rgb(254 226 226) !important; /* red-100 */
   border: 1px solid rgb(254 202 202) !important; /* red-200 */
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  font-weight: 500;
+  border-radius: 8px;
 }
 
 /* Start of Multi-Day Range */
@@ -173,6 +206,11 @@
   border: 1px solid rgb(254 202 202) !important; /* red-200 */
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  font-weight: 500;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
 }
 
 /* Middle of Multi-Day Range */
@@ -187,6 +225,8 @@
   border-top: 1px solid rgb(254 202 202) !important; /* red-200 */
   border-bottom: 1px solid rgb(254 202 202) !important; /* red-200 */
   border-radius: 0 !important;
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
 }
 
 /* End of Multi-Day Range */
@@ -204,6 +244,11 @@
   border: 1px solid rgb(254 202 202) !important; /* red-200 */
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  font-weight: 500;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 /* Override: Handle case where a single day is both start and end (treat as single day) */
