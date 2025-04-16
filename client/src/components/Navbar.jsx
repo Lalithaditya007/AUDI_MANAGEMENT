@@ -34,7 +34,7 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
 
     return (
         <>
-            <nav className={`fixed top-0 left-0 right-0 p-4 shadow-md z-50 ${isHomePage ? "bg-white/20" : "bg-white/20"} backdrop-blur-sm transition-all duration-300`}>
+            <nav className={`fixed top-0 left-0 right-0 p-4 shadow-md z-50 bg-white transition-all duration-300`}>
                 <div className="container mx-auto flex justify-between items-center flex-wrap">
                     <div className="flex items-center space-x-4 mb-2 sm:mb-0 mr-4">
                         <img
