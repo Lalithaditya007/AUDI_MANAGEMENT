@@ -2,7 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; // Base Calendar CSS
 import './AdminScheduleViewer.css'; // Import Custom CSS (create this file)
-import { format, startOfDay, endOfDay, parseISO, getMonth, getYear, addMonths, subMonths, isSameDay, isWithinInterval, isBefore, isAfter } from 'date-fns'; // Import required functions
+import { 
+    format, 
+    startOfDay, 
+    endOfDay, 
+    parseISO, 
+    getMonth, 
+    getYear, 
+    addMonths, 
+    subMonths, 
+    isSameDay, 
+    isWithinInterval, 
+    isBefore, 
+    isAfter,
+    differenceInDays 
+} from 'date-fns'; // Import required functions
 
 function AdminScheduleViewer() {
     // --- Component State ---
@@ -101,7 +115,7 @@ function AdminScheduleViewer() {
                             </option>
                             {auditoriums.map(a => (
                                 <option key={a._id} value={a._id}>
-                                    {a.name}{a.location ? ` (${a.location})` : ''}
+                                    {a.name}
                                 </option>
                             ))}
                         </select>
@@ -190,32 +204,76 @@ function AdminScheduleViewer() {
                         
                         {!isLoadingSchedule && selectedDateBookings.length > 0 && (
                             <ul className="space-y-3 overflow-y-auto max-h-[calc(100vh-300px)]">
-                                {selectedDateBookings.map(booking => (
-                                    <li key={booking._id} 
-                                        className="p-3 bg-gradient-to-r from-red-50 to-white border border-red-100 rounded-lg hover:shadow-sm transition-shadow">
-                                        <p className="font-medium text-gray-900 truncate">
-                                            {booking.eventName || 'Untitled Event'}
-                                        </p>
-                                        <div className="mt-2 space-y-1 text-sm text-gray-600">
-                                            <p className="flex items-center">
-                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                {format(parseISO(booking.startTime), 'h:mm a')} - {format(parseISO(booking.endTime), 'h:mm a')}
-                                            </p>
-                                            {booking.user && (
-                                                <p className="flex items-center text-gray-500">
-                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                    </svg>
-                                                    {booking.user.username || booking.user.email || 'N/A'}
+                                {selectedDateBookings.map(booking => {
+                                    const startDate = parseISO(booking.startTime);
+                                    const endDate = parseISO(booking.endTime);
+                                    const isMultiDay = !isSameDay(startDate, endDate);
+
+                                    return (
+                                        <li key={booking._id} 
+                                            className="p-4 bg-gradient-to-r from-red-50 to-white border border-red-100 rounded-lg hover:shadow-sm transition-shadow">
+                                            {/* Event Title */}
+                                            <div className="flex items-start justify-between">
+                                                <p className="font-medium text-gray-900 truncate flex-1">
+                                                    {booking.eventName || 'Untitled Event'}
                                                 </p>
-                                            )}
-                                        </div>
-                                    </li>
-                                ))}
+                                                {isMultiDay && (
+                                                    <span className="ml-2 text-xs px-2 py-0.5 bg-red-100 text-red-800 rounded-full">
+                                                        Multi-day
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Time Details */}
+                                            <div className="mt-3 space-y-2 text-sm text-gray-600">
+                                                <div className="flex items-start">
+                                                    <svg className="w-4 h-4 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <div className="space-y-1">
+                                                        <p>
+                                                            <span className="text-gray-500">Starts:</span>{' '}
+                                                            {format(startDate, 'MMM d, yyyy h:mm a')}
+                                                        </p>
+                                                        <p>
+                                                            <span className="text-gray-500">Ends:</span>{' '}
+                                                            {format(endDate, 'MMM d, yyyy h:mm a')}
+                                                        </p>
+                                                        {isMultiDay && (
+                                                            <p className="text-xs text-gray-500">
+                                                                Duration: {format(endDate, 'MMM d')} - {format(startDate, 'MMM d')}
+                                                                {' '}({differenceInDays(endDate, startDate)} days)
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Organizer Info */}
+                                                {booking.user && (
+                                                    <div className="flex items-center pt-2 text-gray-500">
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                        </svg>
+                                                        <span>{booking.user.username || booking.user.email || 'N/A'}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Department Info - if available */}
+                                                {booking.department && (
+                                                    <div className="flex items-center text-gray-500">
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                        </svg>
+                                                        <span>{booking.department.name}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </div>
