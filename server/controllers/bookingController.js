@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
-const { DateTime } = require('luxon'); // <-- Make sure Luxon is imported
+const { DateTime } = require('luxon'); // Make sure Luxon is imported
 
 const Booking = require('../models/Booking');
 const Auditorium = require('../models/Auditorium');
@@ -21,762 +21,149 @@ const openingHourIST = 9; // Bookings cannot start before 9 AM IST
 const bookingLeadTimeHours = 2; // Bookings must be made at least 2 hours in advance
 
 // --- Helper: File Cleanup ---
-
-/**
- * Attempts to delete an uploaded file, typically used on error.
- * @param {object | string | undefined} file - The file object (from multer) or a file path string.
- */
 const cleanupUploadedFileOnError = (file) => {
-  if (!file) {
-    return;
-  }
-  const filePath = typeof file === 'string' && file.startsWith('/uploads/')
-    ? path.join(__dirname, '..', file)
-    : file.path;
-
-  if (filePath) {
-    const fullPath = path.resolve(filePath);
-    console.log(`[CLEANUP] Attempting delete: ${fullPath}`);
-    fs.unlink(fullPath, (err) => {
-      if (err && err.code !== 'ENOENT') {
-        console.error(`[CLEANUP] FAILED delete ${fullPath}:`, err);
-      } else if (!err) {
-        console.log(`[CLEANUP] Success delete: ${fullPath}`);
-      }
-    });
-  } else {
-    console.warn('[CLEANUP] Could not determine file path for cleanup.');
-  }
+  if (!file) { return; }
+  const filePath = typeof file === 'string' && file.startsWith('/uploads/') ? path.join(__dirname, '..', file) : file.path;
+  if (filePath) { const fullPath = path.resolve(filePath); console.log(`[CLEANUP] Attempting delete: ${fullPath}`); fs.unlink(fullPath, (err) => { if (err && err.code !== 'ENOENT') { console.error(`[CLEANUP] FAILED delete ${fullPath}:`, err); } else if (!err) { console.log(`[CLEANUP] Success delete: ${fullPath}`); } }); } else { console.warn('[CLEANUP] Could not determine file path for cleanup.'); }
 };
 
 // ==================================================
 //             BOOKING CONTROLLER FUNCTIONS
 // ==================================================
 
-/**
- * @desc    Create a new booking request
- * @route   POST /api/bookings
- * @access  Private (User - needs login)
- */
+/** createBooking */
 exports.createBooking = async (req, res) => {
-    try {
-        const eventImage = req.file ? `/uploads/${req.file.filename}` : null;
-
-        const booking = await Booking.create({
-            eventName: req.body.eventName,
-            description: req.body.description,
-            startTime: req.body.startTime,
-            endTime: req.body.endTime,
-            auditorium: req.body.auditorium,
-            department: req.body.department,
-            user: req.user._id,
-            eventImages: eventImage ? [eventImage] : [],
-            status: 'pending'
-        });
-
-        const populatedBooking = await Booking.findById(booking._id)
-            .populate('user', 'email username')
-            .populate('auditorium', 'name location')
-            .populate('department', 'name');
-
-        try {
-            await sendBookingRequestEmail(
-                populatedBooking.user.email,
-                populatedBooking,
-                populatedBooking.auditorium,
-                populatedBooking.department
-            );
-            console.log(`[Email Sent] Booking request confirmation sent for ${booking._id} to ${populatedBooking.user.email}`);
-        } catch (emailError) {
-            console.error(`[Non-critical Error] Failed sending booking request email for ${booking._id}:`, emailError);
-        }
-
-        res.status(201).json({
-            success: true,
-            message: 'Booking created successfully',
-            data: booking
-        });
-
-    } catch (error) {
-        if (req.file) {
-             // Ensure fs is required if not globally required
-             // const fs = require('fs'); // Uncomment if fs not globally required
-             cleanupUploadedFileOnError(req.file); // Use the helper
-         }
-        console.error("[Error] Create Booking Failed:", error); // Add more specific log
-        res.status(500).json({
-            success: false,
-            // Provide a more user-friendly message, check error type if needed
-            message: error.message || 'Server error creating booking.'
-        });
-    }
+    try { const eventImage=req.file?`/uploads/${req.file.filename}`:null; const booking=await Booking.create({eventName:req.body.eventName,description:req.body.description,startTime:req.body.startTime,endTime:req.body.endTime,auditorium:req.body.auditorium,department:req.body.department,user:req.user._id,eventImages:eventImage?[eventImage]:[],status:'pending'}); const populatedBooking=await Booking.findById(booking._id).populate('user', 'email username').populate('auditorium', 'name location').populate('department', 'name'); try { await sendBookingRequestEmail(populatedBooking.user.email, populatedBooking, populatedBooking.auditorium, populatedBooking.department); console.log(`[Email Sent] Booking req confirm sent for ${booking._id}`); } catch (emailError) { console.error(`[Non-critical Error] Email send fail ${booking._id}:`, emailError); } res.status(201).json({success:true, message:'Booking created successfully', data:booking}); } catch (error) { if (req.file) { cleanupUploadedFileOnError(req.file); } console.error("[Error] Create Booking Failed:", error); res.status(500).json({success:false, message: error.message || 'Server error creating booking.'}); }
 };
 
-/**
- * @desc    Get bookings made by the currently logged-in user
- * @route   GET /api/bookings/mybookings
- * @access  Private (User - needs login)
- */
+/** getMyBookings */
 exports.getMyBookings = async (req, res, next) => {
-  const userId = req.user._id;
-  try {
-    const userBookings = await Booking.find({ user: userId })
-      .populate('auditorium', 'name location capacity')
-      .populate('department', 'name code')
-      .sort({ startTime: -1 });
-
-    res.status(200).json({
-      success: true,
-      count: userBookings.length,
-      data: userBookings,
-    });
-  } catch (error) {
-    console.error(`[Error] Fetch user ${userId} bookings failed:`, error);
-    res.status(500).json({ success: false, message: 'Server error retrieving your bookings.' });
-  }
+  const userId = req.user._id; try { const userBookings=await Booking.find({ user: userId }).populate('auditorium', 'name location capacity').populate('department', 'name code').sort({ startTime: -1 }); res.status(200).json({success:true, count: userBookings.length, data: userBookings}); } catch (error) { console.error(`[Error] Fetch user ${userId} bookings fail:`, error); res.status(500).json({success:false, message: 'Server error retrieving bookings.'}); }
 };
 
-/**
- * @desc    Get all bookings, with optional filters (Admin view)
- * @route   GET /api/bookings/admin/all
- * @access  Private (Admin)
- */
+/** getAllBookings (Admin) */
 exports.getAllBookings = async (req, res, next) => {
-  try {
-    const query = {};
-    const filtersApplied = {};
-    if (req.query.status && ['pending', 'approved', 'rejected'].includes(req.query.status)) {
-      query.status = req.query.status;
-      filtersApplied.status = req.query.status;
-    }
-    if (req.query.auditoriumId && mongoose.Types.ObjectId.isValid(req.query.auditoriumId)) {
-      query.auditorium = req.query.auditoriumId;
-      filtersApplied.auditoriumId = req.query.auditoriumId;
-    }
-    if (req.query.departmentId && mongoose.Types.ObjectId.isValid(req.query.departmentId)) {
-      query.department = req.query.departmentId;
-      filtersApplied.departmentId = req.query.departmentId;
-    }
-    if (req.query.eventName) {
-      query.eventName = { $regex: req.query.eventName, $options: 'i' };
-      filtersApplied.eventName = req.query.eventName;
-    }
-    if (req.query.userEmail) {
-      const users = await User.find({ email: { $regex: req.query.userEmail, $options: 'i' } }).select('_id');
-      const userIds = users.map(user => user._id);
-      if (userIds.length === 0) {
-        return res.status(200).json({ success: true, count: 0, filtersApplied, data: [] });
-      }
-      query.user = { $in: userIds };
-      filtersApplied.userEmail = req.query.userEmail;
-    }
-    if (req.query.date) {
-      const targetDateLuxon = DateTime.fromISO(req.query.date, { zone: istTimezone });
-      if (!targetDateLuxon.isValid) {
-        return res.status(400).json({ success: false, message: `Invalid date format for filtering: ${req.query.date}. Use YYYY-MM-DD.` });
-      }
-      const startOfDayUTC = targetDateLuxon.startOf('day').toUTC().toJSDate();
-      const endOfDayUTC = targetDateLuxon.endOf('day').toUTC().toJSDate();
-      query.startTime = { $lt: endOfDayUTC };
-      query.endTime = { $gt: startOfDayUTC };
-      filtersApplied.date = req.query.date;
-    }
-
-    const bookings = await Booking.find(query)
-      .populate('user', 'username email')
-      .populate('auditorium', 'name location capacity')
-      .populate('department', 'name code')
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      count: bookings.length,
-      filtersApplied,
-      data: bookings,
-    });
-  } catch (error) {
-    console.error("[Error] Fetch all bookings (admin) failed:", error);
-    res.status(500).json({ success: false, message: 'Server error retrieving all bookings.' });
-  }
+    try { const query={}; const filtersApplied={}; if(req.query.status&&['pending', 'approved', 'rejected'].includes(req.query.status)){query.status=req.query.status;filtersApplied.status=req.query.status} if(req.query.auditoriumId&&mongoose.Types.ObjectId.isValid(req.query.auditoriumId)){query.auditorium=req.query.auditoriumId;filtersApplied.auditoriumId=req.query.auditoriumId} if(req.query.departmentId&&mongoose.Types.ObjectId.isValid(req.query.departmentId)){query.department=req.query.departmentId;filtersApplied.departmentId=req.query.departmentId} if(req.query.eventName){query.eventName={$regex:req.query.eventName, $options:'i'};filtersApplied.eventName=req.query.eventName} if(req.query.userEmail){const users=await User.find({email:{$regex:req.query.userEmail, $options:'i'}}).select('_id'); const userIds=users.map(u=>u._id); if(userIds.length===0){return res.status(200).json({success:true, count:0, filtersApplied, data:[]})} query.user={$in:userIds};filtersApplied.userEmail=req.query.userEmail} if(req.query.date){const targetDate=DateTime.fromISO(req.query.date,{zone:istTimezone}); if(!targetDate.isValid){return res.status(400).json({success:false, message:`Invalid date filter: ${req.query.date}.`})} const startUTC=targetDate.startOf('day').toUTC().toJSDate(); const endUTC=targetDate.endOf('day').toUTC().toJSDate(); query.startTime={$lt:endUTC}; query.endTime={$gt:startUTC}; filtersApplied.date=req.query.date} const bookings=await Booking.find(query).populate('user','username email').populate('auditorium','name location').populate('department','name code').sort({createdAt:-1}); res.status(200).json({success:true, count:bookings.length, filtersApplied, data:bookings}); } catch(error){ console.error("Admin get all bookings err:",error); res.status(500).json({success:false, message:'Server error getting bookings.'}); }
 };
 
-/**
- * @desc    Approve a pending booking
- * @route   PATCH /api/bookings/admin/approve/:id  <- NOTE: Route path often includes '/admin'
- *                                                  Your bookingRoutes.js used /:id/approve. Be consistent!
- * @access  Private (Admin)
- */
+/** approveBooking (Admin) */
 exports.approveBooking = async (req, res, next) => {
-  const bookingId = req.params.id;
-  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-    return res.status(400).json({ success: false, message: "Invalid Booking ID format." });
-  }
-  try {
-    const booking = await Booking.findById(bookingId)
-      .populate('user', 'email username')
-      .populate('auditorium')
-      .populate('department', 'name');
-
-    if (!booking) {
-      return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
-    }
-    if (booking.status !== 'pending') {
-      return res.status(400).json({ success: false, message: `Booking status is already '${booking.status}'. Cannot approve.` });
-    }
-
-    const conflict = await Booking.findOne({
-      _id: { $ne: booking._id },
-      auditorium: booking.auditorium._id,
-      status: 'approved',
-      startTime: { $lt: booking.endTime },
-      endTime: { $gt: booking.startTime },
-    });
-
-    if (conflict) {
-      console.warn(`[Approval Conflict] Booking ${bookingId} conflicts with approved booking ${conflict._id} upon approval attempt.`);
-      return res.status(409).json({
-        success: false,
-        message: `Approval failed: Time slot now conflicts with another approved booking (ID: ${conflict._id}). Please review the schedule.`,
-      });
-    }
-
-    booking.status = 'approved';
-    booking.rejectionReason = undefined;
-    const updatedBooking = await booking.save();
-    console.log(`[Success] Booking ${updatedBooking._id} approved.`);
-
-    try {
-      if (booking.user?.email && booking.auditorium && booking.department) {
-        await sendBookingApprovalEmail(booking.user.email, updatedBooking, booking.auditorium, booking.department);
-        console.log(`[Email Sent] Approval email sent for ${updatedBooking._id} to ${booking.user.email}`);
-      } else {
-        console.warn(`[Email Skipped] Missing data for approved booking ${updatedBooking._id}. Cannot send email.`);
-      }
-    } catch (emailError) {
-      console.error(`[Non-critical Error] Failed sending approval email for ${updatedBooking._id}:`, emailError.message || emailError);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Booking approved successfully.',
-      data: updatedBooking,
-    });
-  } catch (error) {
-    console.error(`[Error] Approve booking ${bookingId} failed:`, error);
-    if (!res.headersSent) {
-      res.status(500).json({ success: false, message: 'Server error approving booking.' });
-    }
-  }
+  const bookingId=req.params.id; if(!mongoose.Types.ObjectId.isValid(bookingId)){return res.status(400).json({success:false, message:"Invalid ID"})} try {const booking=await Booking.findById(bookingId).populate('user','email username').populate('auditorium').populate('department','name'); if(!booking){return res.status(404).json({success:false, message:`Booking ${bookingId} not found.`})} if(booking.status!=='pending'){return res.status(400).json({success:false, message:`Status already '${booking.status}'.`})} const conflict=await Booking.findOne({_id:{$ne:booking._id}, auditorium:booking.auditorium._id, status:'approved', startTime:{$lt:booking.endTime}, endTime:{$gt:booking.startTime}}); if(conflict){console.warn(`Approve Conflict: ${bookingId} vs ${conflict._id}`);return res.status(409).json({success:false, message:`Time conflicts with approved booking ${conflict._id}.`})} booking.status='approved';booking.rejectionReason=undefined;const updatedBooking=await booking.save();console.log(`Booking ${updatedBooking._id} approved.`); try{if(booking.user?.email&&booking.auditorium&&booking.department){await sendBookingApprovalEmail(booking.user.email, updatedBooking, booking.auditorium, booking.department); console.log(`Approve email sent for ${updatedBooking._id}`)}else{console.warn(`Email skipped approve ${updatedBooking._id}.`)}}catch(e){console.error(`Approve email err ${updatedBooking._id}:`, e.message||e)} res.status(200).json({success:true, message:'Booking approved.', data:updatedBooking});} catch(error){ console.error(`Approve err ${bookingId}:`,error); if(!res.headersSent){res.status(500).json({success:false, message:'Server error approving.'});}}
 };
 
-/**
- * @desc    Reject a pending booking
- * @route   PATCH /api/bookings/admin/reject/:id  <- NOTE: Route path consistency
- *                                                  Your bookingRoutes.js used /:id/reject. Be consistent!
- * @access  Private (Admin)
- */
+/** rejectBooking (Admin) */
 exports.rejectBooking = async (req, res, next) => {
-  const bookingId = req.params.id;
-  const { rejectionReason } = req.body;
-
-  if (!rejectionReason || !rejectionReason.trim()) {
-    return res.status(400).json({ success: false, message: 'Rejection reason is required.' });
-  }
-  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-    return res.status(400).json({ success: false, message: "Invalid Booking ID format." });
-  }
-
-  try {
-    const booking = await Booking.findById(bookingId)
-      .populate('user', 'email username')
-      .populate('auditorium')
-      .populate('department', 'name');
-
-    if (!booking) {
-      return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
-    }
-    if (booking.status !== 'pending') {
-      return res.status(400).json({ success: false, message: `Booking status is already '${booking.status}'. Cannot reject.` });
-    }
-
-    booking.status = 'rejected';
-    booking.rejectionReason = rejectionReason.trim();
-    const updatedBooking = await booking.save();
-    console.log(`[Success] Booking ${updatedBooking._id} rejected. Reason: ${updatedBooking.rejectionReason}`);
-
-    try {
-      if (booking.user?.email && booking.auditorium && booking.department) {
-        await sendBookingRejectionEmail(
-          booking.user.email,
-          updatedBooking,
-          booking.auditorium,
-          booking.department,
-          updatedBooking.rejectionReason
-        );
-        console.log(`[Email Sent] Rejection email sent for ${updatedBooking._id} to ${booking.user.email}`);
-      } else {
-        console.warn(`[Email Skipped] Missing data for rejected booking ${updatedBooking._id}. Cannot send email.`);
-      }
-    } catch (emailError) {
-      console.error(`[Non-critical Error] Failed sending rejection email for ${updatedBooking._id}:`, emailError.message || emailError);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Booking rejected successfully.',
-      data: updatedBooking,
-    });
-  } catch (error) {
-    console.error(`[Error] Reject booking ${bookingId} failed:`, error);
-    if (!res.headersSent) {
-      res.status(500).json({ success: false, message: 'Server error rejecting booking.' });
-    }
-  }
+  const bookingId=req.params.id; const{rejectionReason}=req.body; if(!rejectionReason||!rejectionReason.trim()){return res.status(400).json({success:false, message:'Reason required.'})} if(!mongoose.Types.ObjectId.isValid(bookingId)){return res.status(400).json({success:false, message:"Invalid ID"})} try {const booking=await Booking.findById(bookingId).populate('user','email username').populate('auditorium').populate('department','name'); if(!booking){return res.status(404).json({success:false, message:`Booking ${bookingId} not found.`})} if(booking.status!=='pending'){return res.status(400).json({success:false, message:`Status already '${booking.status}'.`})} booking.status='rejected';booking.rejectionReason=rejectionReason.trim();const updatedBooking=await booking.save();console.log(`Booking ${updatedBooking._id} rejected. Reason: ${updatedBooking.rejectionReason}`); try{if(booking.user?.email&&booking.auditorium&&booking.department){await sendBookingRejectionEmail(booking.user.email,updatedBooking,booking.auditorium,booking.department,updatedBooking.rejectionReason);console.log(`Reject email sent ${updatedBooking._id}`)}else{console.warn(`Email skipped reject ${updatedBooking._id}`)}}catch(e){console.error(`Reject email err ${updatedBooking._id}:`, e.message||e)} res.status(200).json({success:true, message:'Booking rejected.', data:updatedBooking});} catch(error){ console.error(`Reject err ${bookingId}:`, error); if(!res.headersSent){res.status(500).json({success:false, message:'Server error rejecting.'});}}
 };
 
-
-/**
- * @desc    Get booking statistics (overall or grouped by auditorium/department)
- * @route   GET /api/bookings/admin/stats?groupBy=[auditorium|department]
- * @access  Private (Admin)
- */
+/** getBookingStats (Admin) */
 exports.getBookingStats = async (req, res, next) => {
-    // Implementation from your provided code...
-    const groupByField = req.query.groupBy;
-    console.log(`[API Call] GET /api/bookings/admin/stats | GroupBy: ${groupByField || 'overall'}`);
-    try {
-        let aggregationPipeline = [];
-        if (groupByField === 'auditorium' || groupByField === 'department') {
-            aggregationPipeline = [ /* Your Grouped Pipeline */
-                { $group: { _id: { group: `$${groupByField}`, status: '$status' }, count: { $sum: 1 }, }, },
-                { $group: { _id: '$_id.group', stats: { $push: { k: "$_id.status", v: "$count" }, }, total: { $sum: '$count' }, }, },
-                { $lookup: { from: groupByField === 'auditorium' ? 'auditoria' : 'departments', localField: '_id', foreignField: '_id', as: 'groupInfo', }, },
-                { $project: { _id: 1, name: { $ifNull: [{ $arrayElemAt: ['$groupInfo.name', 0] }, 'Unknown/Deleted'] }, statsAsObject: { $arrayToObject: '$stats' }, total: 1, }, },
-                { $replaceRoot: { newRoot: { $mergeObjects: [ { _id: '$_id', name: '$name', total: '$total', pending: 0, approved: 0, rejected: 0 }, '$statsAsObject', ], }, }, },
-                { $sort: { name: 1 } },
-             ];
-        } else {
-             aggregationPipeline = [ /* Your Overall Pipeline */
-                 { $group: { _id: '$status', count: { $sum: 1 } } },
-                 { $group: { _id: null, stats: { $push: { k: "$_id", v: "$count" } }, total: { $sum: "$count" } } },
-                 { $replaceRoot: { newRoot: { $mergeObjects: [ { total: 0, pending: 0, approved: 0, rejected: 0 }, { $arrayToObject: "$stats" }, { total: { $ifNull: ["$total", 0] } } ] } } }
-             ];
-        }
-        const statsResult = await Booking.aggregate(aggregationPipeline);
-        const responseData = (groupByField === 'auditorium' || groupByField === 'department') ? statsResult : (statsResult[0] || { total: 0, pending: 0, approved: 0, rejected: 0 });
-        res.status(200).json({ success: true, groupedBy: groupByField || 'overall', data: responseData });
-    } catch (error) {
-        console.error(`[Error] Get booking stats (GroupBy: ${groupByField || 'overall'}) failed:`, error);
-        res.status(500).json({ success: false, message: 'Server error retrieving booking statistics.' });
-    }
+    const groupByField=req.query.groupBy; console.log(`Get Stats | GroupBy: ${groupByField||'overall'}`); try {let pipeline=[]; if(groupByField==='auditorium'||groupByField==='department'){pipeline=[{$group:{_id:{group:`$${groupByField}`,status:'$status'},count:{$sum:1}}},{$group:{_id:'$_id.group',stats:{$push:{k:"$_id.status",v:"$count"}},total:{$sum:'$count'}}},{$lookup:{from:groupByField==='auditorium'?'auditoria':'departments',localField:'_id',foreignField:'_id',as:'groupInfo'}},{$project:{_id:1,name:{$ifNull:[{$arrayElemAt:['$groupInfo.name',0]},'Unknown']},statsAsObject:{$arrayToObject:'$stats'},total:1}},{$replaceRoot:{newRoot:{$mergeObjects:[{_id:'$_id',name:'$name',total:'$total',pending:0,approved:0,rejected:0},'$statsAsObject']}}},{$sort:{name:1}}]} else {pipeline=[{$group:{_id:'$status',count:{$sum:1}}},{$group:{_id:null,stats:{$push:{k:"$_id",v:"$count"}},total:{$sum:"$count"}}},{$replaceRoot:{newRoot:{$mergeObjects:[{total:0,pending:0,approved:0,rejected:0},{$arrayToObject:"$stats"},{total:{$ifNull:["$total",0]}}]}}}]} const result=await Booking.aggregate(pipeline); const data=(groupByField==='auditorium'||groupByField==='department')?result:(result[0]||{total:0,pending:0,approved:0,rejected:0}); res.status(200).json({success:true, groupedBy:groupByField||'overall', data:data});} catch(error){console.error(`Stats err (GroupBy:${groupByField||'overall'}):`,error);res.status(500).json({success:false, message:'Server error getting stats.'});}
 };
 
-
-/**
- * @desc    Withdraw/Cancel a booking (by the user who made it)
- * @route   DELETE /api/bookings/:id <-- Mismatch? History routes file uses /:id
- *                                      User routes file uses /:id. Be consistent.
- * @access  Private (User - needs login)
- */
+/** withdrawBooking (User) */
 exports.withdrawBooking = async (req, res, next) => {
-    const bookingId = req.params.id;
-    const userId = req.user._id;
-    console.log(`[API Call] DELETE /api/bookings/${bookingId} | User: ${userId}`); // Updated path to match routes file
-
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-        return res.status(400).json({ success: false, message: 'Invalid Booking ID format.' });
-    }
-    try {
-        const booking = await Booking.findOne({ _id: bookingId, user: userId });
-        if (!booking) {
-            return res.status(404).json({ success: false, message: 'Booking not found or you do not have permission to modify it.' });
-        }
-        if (!['pending', 'approved'].includes(booking.status)) {
-             return res.status(400).json({ success: false, message: `Cannot withdraw booking: Current status is '${booking.status}'.` });
-         }
-
-         // NEW: Lead Time Check for 'approved' bookings
-        if (booking.status === 'approved') {
-            const now = DateTime.now();
-            const startTime = DateTime.fromJSDate(booking.startTime);
-            const allowedWithdrawalTime = startTime.minus({ hours: bookingLeadTimeHours });
-            if (now > allowedWithdrawalTime) {
-                 return res.status(400).json({
-                      success: false,
-                      message: `Cannot withdraw booking: Approved bookings can only be withdrawn up to ${bookingLeadTimeHours} hours before the event starts.`
-                 });
-            }
-        }
-
-
-        if (booking.eventImages && booking.eventImages.length > 0) {
-            booking.eventImages.forEach(imagePath => {
-                 if (imagePath) {
-                      console.log(`[Withdrawal] Cleaning up image: ${imagePath}`);
-                     cleanupUploadedFileOnError(imagePath);
-                }
-            });
-        }
-        await Booking.deleteOne({ _id: bookingId });
-        console.log(`[Success] Booking ${bookingId} withdrawn successfully by user ${userId}.`);
-        res.status(200).json({ success: true, message: 'Booking withdrawn successfully.' });
-    } catch (error) {
-        console.error(`[Error] Withdraw booking ${bookingId} failed for user ${userId}:`, error);
-        if (!res.headersSent) {
-             res.status(500).json({ success: false, message: 'Server error withdrawing booking.' });
-        }
-    }
+    const bookingId=req.params.id; const userId=req.user._id; console.log(`DELETE /bookings/${bookingId} | User: ${userId}`); if(!mongoose.Types.ObjectId.isValid(bookingId)){return res.status(400).json({success:false, message:'Invalid ID.'})} try {const booking=await Booking.findOne({_id:bookingId, user:userId}); if(!booking){return res.status(404).json({success:false, message:'Booking not found or no permission.'})} if(!['pending','approved'].includes(booking.status)){return res.status(400).json({success:false, message:`Cannot withdraw status: '${booking.status}'.`})} if(booking.status==='approved'){const now=DateTime.now(); const startTime=DateTime.fromJSDate(booking.startTime); const allowedWithdrawTime=startTime.minus({hours:bookingLeadTimeHours||2}); if(now>allowedWithdrawTime){return res.status(400).json({success:false, message:`Cannot withdraw approved booking <= ${bookingLeadTimeHours} hrs before start.`})}} if(booking.eventImages&&booking.eventImages.length>0){booking.eventImages.forEach(p=>{if(p){console.log(`Withdrawal cleanup: ${p}`);cleanupUploadedFileOnError(p)}})} await Booking.deleteOne({_id:bookingId}); console.log(`Booking ${bookingId} withdrawn by ${userId}.`); res.status(200).json({success:true, message:'Booking withdrawn.'});} catch(error){ console.error(`Withdraw err ${bookingId} user ${userId}:`, error); if(!res.headersSent){res.status(500).json({success:false, message:'Server error withdrawing.'});}}
 };
 
-
-/**
- * @desc    Request to reschedule an *approved* booking (by the user)
- * @route   PUT /api/bookings/:id  <-- Mismatch? History routes file uses /:id
- *                                  User routes file uses /:id. Be consistent.
- * @access  Private (User - needs login)
- */
+/** requestReschedule (User) */
 exports.requestReschedule = async (req, res, next) => {
-    const bookingId = req.params.id;
-    const userId = req.user._id;
-    // NOTE: You send { newStartTime, newEndTime } in the PUT body in the history file,
-    // Let's align with that here.
-    const { newStartTime, newEndTime } = req.body;
-    console.log(`[API Call] PUT /api/bookings/${bookingId} (Reschedule) | User: ${userId}`); // Updated path
-
-    if (!newStartTime || !newEndTime) {
-        return res.status(400).json({ success: false, message: 'New start time and new end time are required.' });
-    }
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-        return res.status(400).json({ success: false, message: 'Invalid Booking ID format.' });
-    }
-
-    try {
-        const booking = await Booking.findOne({ _id: bookingId, user: userId })
-            .populate('auditorium')
-            .populate('department', 'name');
-
-        if (!booking) {
-            return res.status(404).json({ success: false, message: 'Booking not found or you do not have permission.' });
-        }
-        if (booking.status !== 'approved') {
-            return res.status(400).json({ success: false, message: `Only approved bookings can be rescheduled. Status is '${booking.status}'.` });
-        }
-
-        const startLuxonNew = DateTime.fromISO(newStartTime);
-        const endLuxonNew = DateTime.fromISO(newEndTime);
-        if (!startLuxonNew.isValid || !endLuxonNew.isValid) {
-            return res.status(400).json({ success: false, message: 'Invalid new date/time format. Use ISO 8601.' });
-        }
-        const startDateNew = startLuxonNew.toJSDate();
-        const endDateNew = endLuxonNew.toJSDate();
-
-        if (startDateNew >= endDateNew) {
-            return res.status(400).json({ success: false, message: 'New end time must be strictly after new start time.' });
-        }
-        const startLuxonNewIST = startLuxonNew.setZone(istTimezone);
-        if (startLuxonNewIST.hour < openingHourIST) {
-             return res.status(400).json({ success: false, message: `New start time cannot be before ${openingHourIST}:00 AM ${istTimezone}.` });
-        }
-        const now = DateTime.now();
-        if (startLuxonNew < now.plus({ hours: bookingLeadTimeHours })) {
-             return res.status(400).json({ success: false, message: `New start time must be at least ${bookingLeadTimeHours} hours in advance.` });
-        }
-        if (booking.startTime.getTime() === startDateNew.getTime() && booking.endTime.getTime() === endDateNew.getTime()) {
-             return res.status(400).json({ success: false, message: `Requested times are the same as current booking.` });
-        }
-
-        const conflictNew = await Booking.findOne({
-             _id: { $ne: booking._id }, auditorium: booking.auditorium._id, status: 'approved',
-             startTime: { $lt: endDateNew }, endTime: { $gt: startDateNew },
-        });
-        if (conflictNew) {
-             console.warn(`[Reschedule Conflict] Booking ${bookingId} conflicts with ${conflictNew._id}.`);
-             return res.status(409).json({ success: false, message: `New time slot conflicts with another approved booking.` });
-        }
-
-        booking.startTime = startDateNew;
-        booking.endTime = endDateNew;
-        booking.status = 'pending'; // Must be re-approved
-        booking.rejectionReason = undefined;
-        const updatedBookingBasic = await booking.save();
-        console.log(`[Success] Booking ${bookingId} reschedule request by user ${userId}. Status 'pending'.`);
-
-        const updatedBookingPopulated = await Booking.findById(updatedBookingBasic._id)
-            .populate('user', 'email username').populate('auditorium').populate('department', 'name');
-
-        res.status(200).json({
-            success: true,
-            message: 'Reschedule request submitted, awaiting re-approval.',
-            data: updatedBookingPopulated,
-        });
-    } catch (error) {
-        console.error(`[Error] Request reschedule for booking ${bookingId} failed:`, error);
-        if (!res.headersSent) {
-            if (error.name === 'ValidationError' || error.name === 'CastError') {
-                 return res.status(400).json({ success: false, message: error.message });
-            }
-             res.status(500).json({ success: false, message: 'Server error processing reschedule.' });
-        }
-    }
+  const bookingId=req.params.id; const userId=req.user._id; const{newStartTime, newEndTime}=req.body; console.log(`PUT /bookings/${bookingId} (Reschedule) | User: ${userId}`); if(!newStartTime||!newEndTime){return res.status(400).json({success:false, message:'New times required.'})} if(!mongoose.Types.ObjectId.isValid(bookingId)){return res.status(400).json({success:false, message:'Invalid ID.'})} try {const booking=await Booking.findOne({_id:bookingId, user:userId}).populate('auditorium').populate('department','name'); if(!booking){return res.status(404).json({success:false, message:'Booking not found/no permission.'})} if(booking.status!=='approved'){return res.status(400).json({success:false, message:`Only approved can be rescheduled. Status '${booking.status}'.`})} const startNew=DateTime.fromISO(newStartTime); const endNew=DateTime.fromISO(newEndTime); if(!startNew.isValid||!endNew.isValid){return res.status(400).json({success:false, message:'Invalid new date/time format.'})} const startJS=startNew.toJSDate(); const endJS=endNew.toJSDate(); if(startJS>=endJS){return res.status(400).json({success:false, message:'New end > start required.'})} const startNewIST=startNew.setZone(istTimezone); if(startNewIST.hour<openingHourIST){return res.status(400).json({success:false, message:`New start >= ${openingHourIST}:00 AM ${istTimezone}.`})} const now=DateTime.now(); if(startNew<now.plus({hours:bookingLeadTimeHours||2})){return res.status(400).json({success:false, message:`New start >= ${bookingLeadTimeHours}h ahead.`})} if(booking.startTime.getTime()===startJS.getTime()&&booking.endTime.getTime()===endJS.getTime()){return res.status(400).json({success:false, message:`Times unchanged.`})} const conflictNew=await Booking.findOne({_id:{$ne:booking._id}, auditorium:booking.auditorium._id, status:'approved', startTime:{$lt:endJS}, endTime:{$gt:startJS}}); if(conflictNew){console.warn(`Reschedule Conflict ${bookingId} vs ${conflictNew._id}.`); return res.status(409).json({success:false, message:`New time conflicts.`})} booking.startTime=startJS; booking.endTime=endJS; booking.status='pending'; booking.rejectionReason=undefined; const saved=await booking.save(); console.log(`Reschedule request ${bookingId} by ${userId}. Status pending.`); const populated=await Booking.findById(saved._id).populate('user','email username').populate('auditorium').populate('department','name'); res.status(200).json({success:true, message:'Reschedule request submitted, awaiting re-approval.', data:populated});} catch(error){ console.error(`Reschedule err ${bookingId}:`, error); if(!res.headersSent){if(error.name==='ValidationError'||error.name==='CastError'){return res.status(400).json({success:false, message:error.message})} res.status(500).json({success:false, message:'Server error rescheduling.'})}}
 };
 
-/**
- * @desc    Get the schedule (approved bookings) for a specific auditorium for a given month/year
- * @route   GET /api/bookings/schedule/:auditoriumId?year=YYYY&month=M
- * @access  Private (User - needs login)
- */
+/** getAuditoriumSchedule */
 exports.getAuditoriumSchedule = async (req, res, next) => {
-    // Implementation from your provided code...
-    const { auditoriumId } = req.params;
-    const year = parseInt(req.query.year, 10);
-    const month = parseInt(req.query.month, 10);
-    console.log(`[API Call] GET /api/bookings/schedule/${auditoriumId} | Year: ${year}, Month: ${month}`);
-
-    if (!mongoose.Types.ObjectId.isValid(auditoriumId)) { return res.status(400).json({ success: false, message: 'Invalid Auditorium ID.' }); }
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || year < 1970 || year > 2100) { return res.status(400).json({ success: false, message: 'Valid year/month needed.' }); }
-
-    try {
-        const startOfMonthLocal = DateTime.local(year, month, 1, { zone: istTimezone }).startOf('month');
-        const endOfMonthLocal = DateTime.local(year, month, 1, { zone: istTimezone }).endOf('month');
-        const startOfMonthUTC = startOfMonthLocal.toUTC().toJSDate();
-        const endOfMonthUTC = endOfMonthLocal.toUTC().toJSDate();
-        console.log(`[DEBUG] Schedule Query UTC Range: ${startOfMonthUTC.toISOString()} - ${endOfMonthUTC.toISOString()}`);
-
-        const scheduleBookings = await Booking.find({
-             auditorium: auditoriumId, status: 'approved',
-             startTime: { $lt: endOfMonthUTC }, endTime: { $gt: startOfMonthUTC },
-        }).populate('user', 'username email').select('eventName startTime endTime user description').sort({ startTime: 1 });
-
-        res.status(200).json({
-            success: true,
-            message: `Schedule fetched for ${startOfMonthLocal.toFormat('MMMM yyyy')}`,
-            count: scheduleBookings.length, data: scheduleBookings,
-        });
-    } catch (error) {
-        console.error(`[Error] Fetching schedule for Audi ${auditoriumId}, ${month}/${year}:`, error);
-        res.status(500).json({ success: false, message: 'Server error retrieving schedule.' });
-    }
+  const {auditoriumId}=req.params; const year=parseInt(req.query.year,10); const month=parseInt(req.query.month,10); console.log(`GET Schedule/${auditoriumId}|Yr:${year},Mo:${month}`); if(!mongoose.Types.ObjectId.isValid(auditoriumId)){return res.status(400).json({success:false, message:'Invalid Audi ID.'})} if(isNaN(year)||isNaN(month)||month<1||month>12||year<1970||year>2100){return res.status(400).json({success:false, message:'Valid yr/mo needed.'})} try {const startLocal=DateTime.local(year,month,1,{zone:istTimezone}).startOf('month'); const endLocal=DateTime.local(year,month,1,{zone:istTimezone}).endOf('month'); const startUTC=startLocal.toUTC().toJSDate(); const endUTC=endLocal.toUTC().toJSDate(); console.log(`Sched Query UTC: ${startUTC.toISOString()} - ${endUTC.toISOString()}`); const schedule=await Booking.find({auditorium:auditoriumId, status:'approved', startTime:{$lt:endUTC}, endTime:{$gt:startUTC}}).populate('user','username email').select('eventName startTime endTime user description').sort({startTime:1}); res.status(200).json({success:true, message:`Sched fetched ${startLocal.toFormat('MMM yyyy')}`, count:schedule.length, data:schedule});} catch(error){console.error(`Err fetch sched Audi ${auditoriumId}, ${month}/${year}:`,error);res.status(500).json({success:false, message:'Server error get sched.'})}
 };
 
-/**
- * @desc    Get recently created pending booking requests (Admin dashboard widget)
- * @route   GET /api/bookings/admin/recent-pending?limit=N
- * @access  Private (Admin)
- */
+/** getRecentPendingBookings (Admin) */
 exports.getRecentPendingBookings = async (req, res, next) => {
-    // Implementation from your provided code...
-    const limit = parseInt(req.query.limit, 10);
-    const effectiveLimit = (!isNaN(limit) && limit > 0) ? Math.min(limit, 20) : 5;
-    console.log(`[API Call] GET /api/bookings/admin/recent-pending | Limit: ${effectiveLimit}`);
-    try {
-        const recentPending = await Booking.find({ status: 'pending' })
-            .sort({ createdAt: -1 }).limit(effectiveLimit)
-            .populate('user', 'username email').populate('auditorium', 'name').populate('department', 'name code');
-        res.status(200).json({ success: true, count: recentPending.length, limit: effectiveLimit, data: recentPending });
-    } catch (error) {
-        console.error("[Error] Fetch recent pending bookings failed:", error);
-        res.status(500).json({ success: false, message: 'Server error retrieving recent pending requests.' });
-    }
+    const limit=parseInt(req.query.limit,10);const effectiveLimit=(!isNaN(limit)&&limit>0)?Math.min(limit,20):5; console.log(`GET recent-pending | Limit:${effectiveLimit}`); try {const recent=await Booking.find({status:'pending'}).sort({createdAt:-1}).limit(effectiveLimit).populate('user','username email').populate('auditorium','name').populate('department','name code'); res.status(200).json({success:true, count:recent.length, limit:effectiveLimit, data:recent});} catch(error){console.error("Err recent pending:",error);res.status(500).json({success:false, message:'Server err recent pending.'})}
 };
 
-/**
- * @desc    Get upcoming approved bookings within the next N days (Admin dashboard widget)
- * @route   GET /api/bookings/admin/upcoming?days=N
- * @access  Private (Admin)
- */
+/** getUpcomingBookings (Admin) */
 exports.getUpcomingBookings = async (req, res, next) => {
-    // Implementation from your provided code...
-    const days = parseInt(req.query.days, 10);
-    const effectiveDays = (!isNaN(days) && days > 0) ? Math.min(days, 30) : 7;
-    console.log(`[API Call] GET /api/bookings/admin/upcoming | Days: ${effectiveDays}`);
-    try {
-        const now = DateTime.now().toJSDate();
-        const futureDate = DateTime.now().plus({ days: effectiveDays }).endOf('day').toJSDate();
-        console.log(`[DEBUG] Upcoming query range: ${now.toISOString()} - ${futureDate.toISOString()}`);
-        const upcomingBookings = await Booking.find({
-            status: 'approved', startTime: { $gte: now, $lt: futureDate },
-        }).sort({ startTime: 1 }).populate('user', 'username email').populate('auditorium', 'name').populate('department', 'name code');
-        res.status(200).json({ success: true, count: upcomingBookings.length, days: effectiveDays, data: upcomingBookings });
-    } catch (error) {
-        console.error("[Error] Fetch upcoming bookings failed:", error);
-        res.status(500).json({ success: false, message: 'Server error retrieving upcoming bookings.' });
-    }
+    const days=parseInt(req.query.days,10); const effectiveDays=(!isNaN(days)&&days>0)?Math.min(days,30):7; console.log(`GET upcoming | Days:${effectiveDays}`); try {const now=DateTime.now().toJSDate(); const future=DateTime.now().plus({days:effectiveDays}).endOf('day').toJSDate(); console.log(`Upcoming query: ${now.toISOString()}-${future.toISOString()}`); const upcoming=await Booking.find({status:'approved',startTime:{$gte:now,$lt:future}}).sort({startTime:1}).populate('user','username email').populate('auditorium','name').populate('department','name code'); res.status(200).json({success:true, count:upcoming.length, days:effectiveDays, data:upcoming});} catch(error){console.error("Err upcoming:",error);res.status(500).json({success:false, message:'Server err upcoming.'})}
 };
 
-/**
- * @desc    Get booking trends (count per day) over the last N days, optionally filtered
- * @route   GET /api/bookings/admin/trends?days=N&auditoriumId=ID&departmentId=ID
- * @access  Private (Admin)
- */
+/** getBookingTrends (Admin) */
 exports.getBookingTrends = async (req, res, next) => {
-    // Implementation from your provided code...
-    const days = parseInt(req.query.days, 10);
-    const auditoriumId = req.query.auditoriumId;
-    const departmentId = req.query.departmentId;
-    const effectiveDays = (!isNaN(days) && days > 0) ? Math.min(days, 90) : 30;
-    console.log(`[API Call] GET /api/bookings/admin/trends | Days: ${effectiveDays}, AudiID: ${auditoriumId || 'N/A'}, DeptID: ${departmentId || 'N/A'}`);
-    try {
-        const startDate = DateTime.now().minus({ days: effectiveDays }).startOf('day').toJSDate();
-        console.log(`[DEBUG] Trends query start date (UTC): ${startDate.toISOString()}`);
-        const matchStage = { createdAt: { $gte: startDate } };
-        if (auditoriumId && mongoose.Types.ObjectId.isValid(auditoriumId)) { matchStage.auditorium = new mongoose.Types.ObjectId(auditoriumId); console.log(`[DEBUG] Filtering trends by Auditorium: ${auditoriumId}`); } else if (auditoriumId) { console.warn(`[WARN] Invalid auditoriumId passed to trends: ${auditoriumId}`); }
-        if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) { matchStage.department = new mongoose.Types.ObjectId(departmentId); console.log(`[DEBUG] Filtering trends by Department: ${departmentId}`); } else if (departmentId) { console.warn(`[WARN] Invalid departmentId passed to trends: ${departmentId}`); }
-
-        const aggregationPipeline = [
-            { $match: matchStage },
-            { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: istTimezone } }, count: { $sum: 1 }, }, },
-            { $project: { _id: 0, date: "$_id", count: 1, }, },
-            { $sort: { date: 1 } },
-        ];
-        const trendsData = await Booking.aggregate(aggregationPipeline);
-
-        const filledTrends = [];
-        let currentDate = DateTime.fromJSDate(startDate).setZone(istTimezone);
-        const endDate = DateTime.now().setZone(istTimezone).startOf('day');
-        const trendsMap = new Map(trendsData.map(item => [item.date, item.count]));
-        while (currentDate <= endDate) {
-            const dateString = currentDate.toFormat('yyyy-MM-dd');
-            filledTrends.push({ date: dateString, count: trendsMap.get(dateString) || 0, });
-            currentDate = currentDate.plus({ days: 1 });
-        }
-        res.status(200).json({ success: true, days: effectiveDays, filters: { auditoriumId, departmentId }, data: filledTrends, });
-    } catch (error) {
-        console.error(`[Error] Fetch booking trends failed (Filters: Audi-${auditoriumId || 'N/A'}, Dept-${departmentId || 'N/A'}):`, error);
-        res.status(500).json({ success: false, message: 'Server error retrieving trends.' });
-    }
+  const days=parseInt(req.query.days,10);const audId=req.query.auditoriumId; const depId=req.query.departmentId; const effectiveDays=(!isNaN(days)&&days>0)?Math.min(days,90):30; console.log(`GET trends|Days:${effectiveDays},Aud:${audId||'N/A'},Dep:${depId||'N/A'}`); try {const startDate=DateTime.now().minus({days:effectiveDays}).startOf('day').toJSDate();console.log(`Trends start:${startDate.toISOString()}`);const match={createdAt:{$gte:startDate}};if(audId&&mongoose.Types.ObjectId.isValid(audId)){match.auditorium=new mongoose.Types.ObjectId(audId);console.log(`Trends filter Audi:${audId}`)}else if(audId){console.warn(`Invalid audId trend:${audId}`)} if(depId&&mongoose.Types.ObjectId.isValid(depId)){match.department=new mongoose.Types.ObjectId(depId);console.log(`Trends filter Dept:${depId}`)}else if(depId){console.warn(`Invalid depId trend:${depId}`)} const pipeline=[{$match:match},{$group:{_id:{$dateToString:{format:"%Y-%m-%d",date:"$createdAt",timezone:istTimezone}},count:{$sum:1}}},{$project:{_id:0,date:"$_id",count:1}},{$sort:{date:1}}];const trends=await Booking.aggregate(pipeline);const filled=[];let curr=DateTime.fromJSDate(startDate).setZone(istTimezone);const end=DateTime.now().setZone(istTimezone).startOf('day');const map=new Map(trends.map(i=>[i.date,i.count]));while(curr<=end){const dStr=curr.toFormat('yyyy-MM-dd');filled.push({date:dStr,count:map.get(dStr)||0});curr=curr.plus({days:1})} res.status(200).json({success:true, days:effectiveDays, filters:{auditoriumId:audId,departmentId:depId}, data:filled});}catch(error){console.error(`Err trends(Filt Aud-${audId||'N/A'},Dep-${depId||'N/A'}):`,error);res.status(500).json({success:false, message:'Server err get trends.'})}
 };
 
-/**
- * @desc    Get booked time slots (approved only) for an auditorium in a given month/year
- * @route   GET /api/bookings/availability/:auditoriumId?year=YYYY&month=M
- * @access  Private (User - needs login)
- */
+/** getAuditoriumAvailability */
 exports.getAuditoriumAvailability = async (req, res, next) => {
-    // Implementation from your provided code...
-     const { auditoriumId } = req.params;
-    const year = parseInt(req.query.year, 10);
-    const month = parseInt(req.query.month, 10);
-    console.log(`[API Call] GET /api/bookings/availability/${auditoriumId} | Year: ${year}, Month: ${month}`);
-
-    if (!mongoose.Types.ObjectId.isValid(auditoriumId)) { return res.status(400).json({ success: false, message: 'Invalid Auditorium ID.' }); }
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || year < 1970 || year > 2100) { return res.status(400).json({ success: false, message: 'Valid year/month needed.' }); }
-
-    try {
-        const startOfMonthUTC = DateTime.local(year, month, 1, { zone: istTimezone }).startOf('month').toUTC().toJSDate();
-        const endOfMonthUTC = DateTime.local(year, month, 1, { zone: istTimezone }).endOf('month').toUTC().toJSDate();
-        console.log(`[DEBUG] Availability query UTC Range: ${startOfMonthUTC.toISOString()} - ${endOfMonthUTC.toISOString()}`);
-
-        const bookedSlots = await Booking.find({
-             auditorium: auditoriumId, status: 'approved',
-             startTime: { $lt: endOfMonthUTC }, endTime: { $gt: startOfMonthUTC }
-        }).select('startTime endTime -_id').lean();
-
-        res.status(200).json({ success: true, message: `Availability fetched for ${year}-${String(month).padStart(2, '0')}`, count: bookedSlots.length, data: bookedSlots });
-    } catch (error) {
-        console.error(`[Error] Fetching availability for Audi ${auditoriumId}, ${month}/${year}:`, error);
-        res.status(500).json({ success: false, message: 'Server error retrieving availability.' });
-    }
+    const {auditoriumId}=req.params;const year=parseInt(req.query.year,10);const month=parseInt(req.query.month,10);console.log(`GET Avail/${auditoriumId}|Yr:${year},Mo:${month}`);if(!mongoose.Types.ObjectId.isValid(auditoriumId)){return res.status(400).json({success:false, message:'Invalid Audi ID.'})} if(isNaN(year)||isNaN(month)||month<1||month>12||year<1970||year>2100){return res.status(400).json({success:false, message:'Valid yr/mo needed.'})} try {const startUTC=DateTime.local(year,month,1,{zone:istTimezone}).startOf('month').toUTC().toJSDate();const endUTC=DateTime.local(year,month,1,{zone:istTimezone}).endOf('month').toUTC().toJSDate();console.log(`Avail Query UTC: ${startUTC.toISOString()}-${endUTC.toISOString()}`);const booked=await Booking.find({auditorium:auditoriumId, status:'approved', startTime:{$lt:endUTC}, endTime:{$gt:startUTC}}).select('startTime endTime -_id').lean();res.status(200).json({success:true, message:`Avail fetch ${year}-${String(month).padStart(2,'0')}`, count:booked.length, data:booked});}catch(error){console.error(`Err Avail Audi ${auditoriumId}, ${month}/${year}:`,error);res.status(500).json({success:false, message:'Server err get avail.'})}
 };
 
-/**
- * @desc    Get current and upcoming events
- * @route   GET /api/bookings/public/events
- * @access  Public
- */
+/** getPublicEvents */
 exports.getPublicEvents = async (req, res) => {
-    // Implementation from your provided code...
-    try {
-        const now = new Date();
-        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const events = await Booking.find({ status: 'approved', $or: [ { startTime: { $lte: now }, endTime: { $gte: now } }, { startTime: { $gt: now, $lt: nextWeek } } ] })
-            .sort({ startTime: 1 }).populate('auditorium', 'name').select('eventName startTime endTime auditorium eventImages');
-        console.log('Found events:', events.length); // Log count
-        res.status(200).json({ success: true, data: events });
-    } catch (error) {
-        console.error("[Error] Fetch public events failed:", error);
-        res.status(500).json({ success: false, message: 'Error fetching events' });
-    }
+    try {const now=new Date(); const nextWeek=new Date(now.getTime()+6048e5);const events=await Booking.find({status:'approved',$or:[{startTime:{$lte:now},endTime:{$gte:now}},{startTime:{$gt:now,$lt:nextWeek}}]}).sort({startTime:1}).populate('auditorium','name').select('eventName startTime endTime auditorium eventImages'); console.log('Found public events:',events.length);res.status(200).json({success:true,data:events});}catch(error){console.error("Err public events:",error);res.status(500).json({success:false, message:'Error fetching events'})}
 };
 
-
-// ==============================================
-//          >>> NEW AVAILABILITY CHECK FUNCTION <<<
-// ==============================================
-
 /**
- * @desc    Check if a time slot is available for a given auditorium
- * @route   GET /api/bookings/check-availability?auditoriumId=ID&startTime=ISO&endTime=ISO
+ * @desc    Check if a time slot is available for a given auditorium, optionally excluding a specific booking
+ * @route   GET /api/bookings/check-availability?auditoriumId=ID&startTime=ISO&endTime=ISO&excludeBookingId=ID (optional)
  * @access  Private (User - needs login)
  */
 exports.checkAvailability = async (req, res, next) => {
-    const { auditoriumId, startTime, endTime } = req.query;
-    console.log(`[API Call] GET /check-availability | Auditorium: ${auditoriumId}, Start: ${startTime}, End: ${endTime}`);
+    const { auditoriumId, startTime, endTime, excludeBookingId } = req.query; // Added excludeBookingId
+    console.log(`[API Call] GET /check-availability | Auditorium: ${auditoriumId}, Start: ${startTime}, End: ${endTime}, Exclude: ${excludeBookingId || 'N/A'}`);
 
     // --- Validation ---
-    if (!auditoriumId || !startTime || !endTime) {
-        return res.status(400).json({ success: false, message: 'Missing required query parameters: auditoriumId, startTime, endTime.' });
-    }
-    if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {
-        return res.status(400).json({ success: false, message: 'Invalid Auditorium ID format.' });
-    }
+    if (!auditoriumId || !startTime || !endTime) { return res.status(400).json({ success: false, message: 'Missing required query parameters: auditoriumId, startTime, endTime.' }); }
+    if (!mongoose.Types.ObjectId.isValid(auditoriumId)) { return res.status(400).json({ success: false, message: 'Invalid Auditorium ID format.' }); }
+    if (excludeBookingId && !mongoose.Types.ObjectId.isValid(excludeBookingId)) { return res.status(400).json({ success: false, message: 'Invalid excludeBookingId format.' }); }
 
     let startDateTimeJS, endDateTimeJS;
     try {
-        // Use Luxon for robust ISO parsing
-        const startLuxon = DateTime.fromISO(startTime);
-        const endLuxon = DateTime.fromISO(endTime);
-
-        if (!startLuxon.isValid || !endLuxon.isValid) {
-            throw new Error('Invalid ISO date format.');
-        }
-        startDateTimeJS = startLuxon.toJSDate(); // Convert to JS Date for Mongoose
-        endDateTimeJS = endLuxon.toJSDate();
-
-         if (startDateTimeJS >= endDateTimeJS) {
-             return res.status(400).json({ success: false, message: 'End time must be strictly after start time.' });
-         }
-
-    } catch (e) {
-        console.error("Date parsing error in checkAvailability:", e.message);
-        return res.status(400).json({ success: false, message: 'Invalid startTime or endTime format. Use full ISO 8601 format (e.g., 2023-10-27T10:00:00.000Z).' });
-    }
+        const startLuxon = DateTime.fromISO(startTime); const endLuxon = DateTime.fromISO(endTime);
+        if (!startLuxon.isValid || !endLuxon.isValid) throw new Error('Invalid ISO date format.');
+        startDateTimeJS = startLuxon.toJSDate(); endDateTimeJS = endLuxon.toJSDate();
+        if (startDateTimeJS >= endDateTimeJS) return res.status(400).json({ success: false, message: 'End time must be strictly after start time.' });
+    } catch (e) { console.error("Date parsing error:", e.message); return res.status(400).json({ success: false, message: 'Invalid startTime or endTime format. Use full ISO 8601 format.' }); }
 
     try {
-        // Find any APPROVED booking that overlaps the requested time for the SPECIFIC auditorium
-        const conflictingBooking = await Booking.findOne({
+        // Build Conflict Query
+        const conflictQuery = {
             auditorium: auditoriumId,
-            status: 'approved', // CRITICAL: Only check against approved bookings
-            startTime: { $lt: endDateTimeJS }, // Conflict starts before requested ends
-            endTime: { $gt: startDateTimeJS },   // Conflict ends after requested starts
-        })
-        .populate('department', 'name') // Populate for the feedback message
-        .select('eventName startTime endTime department') // Select only necessary fields for feedback
-        .lean(); // Use lean for performance
+            status: 'approved',
+            startTime: { $lt: endDateTimeJS },
+            endTime: { $gt: startDateTimeJS },
+        };
+        // *** Exclude the specific booking ID if provided ***
+        if (excludeBookingId) {
+            conflictQuery._id = { $ne: excludeBookingId }; // $ne means "not equal"
+            console.log(`[DEBUG] Excluding booking ${excludeBookingId} from conflict check.`);
+        } else {
+            console.log(`[DEBUG] No booking ID excluded.`);
+        }
+
+        const conflictingBooking = await Booking.findOne(conflictQuery)
+            .populate('department', 'name')
+            .populate('user', 'username')
+            .select('eventName startTime endTime department user _id') // Ensure _id is selected for check below
+            .lean();
 
         if (conflictingBooking) {
-             console.log(`[Conflict Found] Auditorium ${auditoriumId} booked from ${conflictingBooking.startTime} to ${conflictingBooking.endTime} for "${conflictingBooking.eventName}"`);
-             res.status(200).json({ // Return 200 OK, but available: false
-                success: true,
-                available: false,
-                conflictingBooking: { // Provide details about the conflict
+             console.log(`[Conflict Found] Audi ${auditoriumId} conflicts with ${conflictingBooking._id}`);
+             res.status(200).json({
+                success: true, available: false,
+                conflictingBooking: {
+                    _id: conflictingBooking._id,
                     eventName: conflictingBooking.eventName,
                     department: conflictingBooking.department?.name || 'N/A',
+                    user: conflictingBooking.user?.username || 'N/A',
                     startTime: conflictingBooking.startTime.toISOString(),
                     endTime: conflictingBooking.endTime.toISOString()
                 },
-                message: `This time slot overlaps with the approved event: "${conflictingBooking.eventName}".`
+                message: `Time slot conflicts with '${conflictingBooking.eventName}'.`
             });
         } else {
-            console.log(`[Availability Check] Auditorium ${auditoriumId} is AVAILABLE from ${startTime} to ${endTime}`);
-            res.status(200).json({
-                success: true,
-                available: true,
-                message: 'Time slot is available.'
-            });
+            console.log(`[Availability Check] Audi ${auditoriumId} AVAILABLE ${startTime} - ${endTime}`);
+            res.status(200).json({ success: true, available: true, message: 'Time slot is available.' });
         }
-
-    } catch (error) {
-        console.error(`[Error] Checking availability for Auditorium ${auditoriumId}:`, error);
-        res.status(500).json({ success: false, message: 'Server error checking availability.' });
-    }
+    } catch (error) { console.error(`[Error] Checking avail for Audi ${auditoriumId}:`, error); res.status(500).json({ success: false, message: 'Server error checking availability.' }); }
 };
+
+// --- END of Controller ---
