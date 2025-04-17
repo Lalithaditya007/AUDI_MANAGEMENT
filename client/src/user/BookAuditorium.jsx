@@ -240,6 +240,8 @@ function BookAuditorium({ userEmail = "" }) {
     if (['auditoriumId', 'startTime', 'endTime'].includes(name)) {
       setConflicts([]);
       setConflictError("");
+      setSubmitError(""); 
+      setSuccessMessage("");
     }
   }
   function handleFileChange(e) {
