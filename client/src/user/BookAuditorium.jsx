@@ -90,6 +90,13 @@ function BookAuditorium({ userEmail = "" }) {
   const [departments, setDepartments] = useState([]);
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
   const [departmentFetchError, setDepartmentFetchError] = useState("");
+
+  // Booking conflicts state
+  const [conflicts, setConflicts] = useState([]);
+  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
+  const [conflictError, setConflictError] = useState("");
+
+  // Submission/Feedback State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -136,18 +143,105 @@ function BookAuditorium({ userEmail = "" }) {
     finally { setIsLoadingDepartments(false); }
   }, []);
 
-  // --- Effect Hook for Initial Data ---
+  /** Fetches existing bookings to check for conflicts */
+  const checkBookingConflicts = useCallback(async () => {
+    // Reset conflict states
+    setConflicts([]);
+    setConflictError("");
+    
+    // Do nothing if we don't have all required fields
+    if (!formData.auditoriumId || !formData.startTime || !formData.endTime) {
+      return;
+    }
+    
+    setIsCheckingConflicts(true);
+    
+    const startDate = new Date(formData.startTime);
+    const endDate = new Date(formData.endTime);
+    
+    // Check for valid dates before proceeding
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate >= endDate) {
+      // Silent return, as this is handled in form validation
+      setIsCheckingConflicts(false);
+      return;
+    }
+    
+    // Construct the API URL with query parameters
+    const apiUrl = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/conflicts`);
+    apiUrl.searchParams.append('auditorium', formData.auditoriumId);
+    apiUrl.searchParams.append('startTime', startDate.toISOString());
+    apiUrl.searchParams.append('endTime', endDate.toISOString());
+    
+    console.log("[API Call] Checking booking conflicts:", apiUrl.toString());
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error("Authentication token missing. Please log in again.");
+      }
+      
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        let errorMsg = `Conflict check failed (${response.status})`;
+        try {
+          const data = await response.json();
+          errorMsg = data.message || errorMsg;
+        } catch (e) { /* ignore parse error */ }
+        throw new Error(errorMsg);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setConflicts(data.data || []);
+      } else {
+        throw new Error(data.message || "Failed to check for booking conflicts");
+      }
+    } catch (err) {
+      console.error("Conflict check error:", err);
+      setConflictError(err.message || "Could not check for booking conflicts.");
+    } finally {
+      setIsCheckingConflicts(false);
+    }
+  }, [formData.auditoriumId, formData.startTime, formData.endTime]); // Dependencies
+
+  // --- Effect Hooks ---
+
+  // Fetch initial dropdown data on component mount
   useEffect(() => {
     fetchAuditoriums();
     fetchDepartments();
   }, [fetchAuditoriums, fetchDepartments]);
 
+  // Check for conflicts when relevant form fields change
+  useEffect(() => {
+    // Set a debounce timer to avoid too many API calls while user is typing
+    const debounceTimer = setTimeout(() => {
+      if (formData.auditoriumId && formData.startTime && formData.endTime) {
+        checkBookingConflicts();
+      }
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(debounceTimer);
+  }, [formData.auditoriumId, formData.startTime, formData.endTime, checkBookingConflicts]);
+
   // --- Form Input Handlers ---
   function handleChange(e) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (['startTime', 'endTime', 'auditoriumId'].includes(name)) {
-        setSubmitError(""); setSuccessMessage("");
+    
+    // Clear any previous conflict messages when input changes
+    if (['auditoriumId', 'startTime', 'endTime'].includes(name)) {
+      setConflicts([]);
+      setConflictError("");
+      setSubmitError(""); 
+      setSuccessMessage("");
     }
   }
   function handleFileChange(e) {
@@ -264,88 +358,200 @@ function BookAuditorium({ userEmail = "" }) {
                 </select>
                 {auditoriumFetchError && <p className="text-red-600 text-xs mt-1">{auditoriumFetchError}</p>}
               </div>
+<<<<<<< HEAD
               <TextAreaField label="Event Description" name="description" value={formData.description} onChange={handleChange} disabled={isSubmitting} required={true} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"> {/* Date Inputs */}
                  <InputField label="Start Date & Time" name="startTime" type="datetime-local" value={formData.startTime} onChange={handleChange} disabled={isSubmitting} required={true} min={getMinDateTimeLocal()} />
                  <InputField label="End Date & Time" name="endTime" type="datetime-local" value={formData.endTime} onChange={handleChange} disabled={isSubmitting} required={true} min={formData.startTime || getMinDateTimeLocal()} />
+=======
+
+              {/* End Auditorium Select */}
+
+              {/* Event Description Text Area */}
+              <TextAreaField
+                label="Event Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                required={false} // Description is optional
+              />
+
+              {/* Start/End Date & Time Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <InputField
+                    label="Start Date & Time"
+                    name="startTime"
+                    type="datetime-local"
+                    value={formData.startTime}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    required={true}
+                  />
+                </div>
+                <div>
+                  <InputField
+                    label="End Date & Time"
+                    name="endTime"
+                    type="datetime-local"
+                    value={formData.endTime}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    required={true}
+                  />
+                </div>
+>>>>>>> d42e8c05e5bcc667f7779b1012367fffc6d7a6c2
               </div>
 
-              {/* Availability Feedback - Reduced spacing */}
-              <div className="min-h-[24px] text-sm"> {/* Reduced min-height */}
-                {isCheckingAvailability && (
-                  <p className="text-gray-500 italic flex items-center animate-pulse">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Checking availability...
-                  </p>
-                )}
-                {!isCheckingAvailability && availabilityError && (
-                  <p className="text-red-600 font-semibold">{availabilityError}</p>
-                )}
-                {!isCheckingAvailability && !availabilityError && !isSlotAvailable && conflictingBookingDetails && (
-                  <div className="text-yellow-800 bg-yellow-50 p-3 rounded-md border border-yellow-200">
-                    <p className="font-bold mb-1">Slot Unavailable</p>
-                    <div className="text-sm space-y-1">
-                      <p>Conflicts with event: <span className="font-semibold">"{conflictingBookingDetails.eventName}"</span></p>
-                      <p>Organized by: <span className="font-semibold">{conflictingBookingDetails.department || 'N/A'}</span></p>
-                      <p>Timing: <span className="font-semibold">
-                        {new Date(conflictingBookingDetails.startTime).toLocaleString('en-US', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short'
-                        })}
-                        {' - '}
-                        {new Date(conflictingBookingDetails.endTime).toLocaleString('en-US', {
-                          timeStyle: 'short'
-                        })}
-                      </span></p>
-                    </div>
+              {/* Booking Conflicts Warning */}
+              {isCheckingConflicts && (
+                <div className="text-yellow-600 text-sm p-2 flex items-center justify-center">
+                  <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Checking availability...
+                </div>
+              )}
+              
+              {conflictError && (
+                <div className="text-red-600 text-sm p-2">
+                  Error checking for conflicts: {conflictError}
+                </div>
+              )}
+              
+              {conflicts.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex items-center">
+                    <svg className="h-5 w-5 text-red-500 mr-2" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span className="text-red-800 font-medium">Time slot unavailable</span>
                   </div>
-                )}
-                {!isCheckingAvailability && !availabilityError && isSlotAvailable && formData.auditoriumId && formData.startTime && formData.endTime && (new Date(formData.startTime) < new Date(formData.endTime)) && (
-                  <p className="text-green-700 font-semibold flex items-center">
-                    <svg className="w-4 h-4 mr-1.5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                    Time slot appears available.
+                  <p className="text-sm text-red-600 mt-1">
+                    The requested time slot conflicts with {conflicts.length} existing booking(s).
                   </p>
-                )}
-              </div>
+                  <ul className="mt-2 text-xs space-y-1 text-red-700">
+                    {conflicts.slice(0, 3).map((booking, idx) => (
+                      <li key={idx} className="flex flex-col sm:flex-row sm:items-center">
+                        <span className="font-medium">{booking.eventName}</span>
+                        <span className="sm:ml-2 text-red-600">
+                          ({new Date(booking.startTime).toLocaleString()} - {new Date(booking.endTime).toLocaleString()})
+                        </span>
+                      </li>
+                    ))}
+                    {conflicts.length > 3 && (
+                      <li>...and {conflicts.length - 3} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              
+              {formData.auditoriumId && formData.startTime && formData.endTime && 
+               !isCheckingConflicts && !conflictError && conflicts.length === 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-2 flex items-center">
+                  <svg className="h-5 w-5 text-green-500 mr-2" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span className="text-green-700 text-sm">Time slot available</span>
+                </div>
+              )}
 
-              {/* Event Poster - Always visible */}
-              <div className="mt-4"> {/* Event Poster */}
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Poster (Optional, Max 5MB)</label>
+              {/* Event Poster File Input Area */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Event Poster (Optional, Max 5MB, Image files only)
+                </label>
                 {!formData.eventPoster ? (
-                  <div className="relative group w-full h-36 border-2 border-dashed rounded-lg border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-100">
+                  // Display file input drop zone
+                  <div className="relative w-full h-36 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition duration-150 flex items-center justify-center cursor-pointer group">
                     <div className="text-center pointer-events-none">
-                      <p className="text-gray-500">Click or drag to upload poster</p>
+                      <svg className="mx-auto h-10 w-10 text-gray-400 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      <p className="text-sm text-gray-500 group-hover:text-gray-600 mt-1">Click or drag image here</p>
+                      <p className="text-xs text-gray-400 group-hover:text-gray-500">PNG, JPG, GIF up to 5MB</p>
                     </div>
-                    <input type="file" name="eventPoster" accept="image/png, image/jpeg, image/gif" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" disabled={isSubmitting} />
+                    <input
+                      type="file"
+                      name="eventPoster"
+                      accept="image/png, image/jpeg, image/gif"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      disabled={isSubmitting}
+                    />
                   </div>
                 ) : (
-                  <div className="relative mt-2 group w-48 h-48 sm:w-56 sm:h-56">
-                    <img src={URL.createObjectURL(formData.eventPoster)} alt="Preview" className="w-full h-full object-cover rounded-lg" onLoad={(e) => URL.revokeObjectURL(e.target.src)}/>
-                    <button type="button" onClick={removePoster} disabled={isSubmitting} className="absolute -top-2 -right-2 bg-red-100 rounded-full p-1 hover:bg-red-200">
-                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  // Display preview and remove button
+                  <div className="relative mt-2 w-48 h-48 sm:w-56 sm:h-56">
+                    <img
+                      src={URL.createObjectURL(formData.eventPoster)}
+                      alt="Preview"
+                      className="w-full h-full object-cover rounded-lg"
+                      onLoad={(e) => URL.revokeObjectURL(e.target.src)} // Revoke object URL after load
+                    />
+                    <button
+                      type="button"
+                      onClick={removePoster}
+                      disabled={isSubmitting}
+                      className="absolute -top-2 -right-2 bg-red-100 rounded-full p-1 hover:bg-red-200"
+                    >
+                      <svg
+                        className="w-5 h-5 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        ></path>
+                      </svg>
                     </button>
                   </div>
                 )}
               </div>
 
-               <div className="pt-6 border-t border-gray-200 text-center"> {/* Submit Button */}
-                 <button
-                   type="submit"
-                   disabled={ // Final check on disabled logic
-                       !isSlotAvailable || isCheckingAvailability || isSubmitting ||
-                       isLoadingAuditoriums || isLoadingDepartments ||
-                       !!auditoriumFetchError || !!departmentFetchError ||
-                       !formData.auditoriumId || !formData.departmentId ||
-                       !formData.startTime || !formData.endTime ||
-                       // Also disable if the input times are known to be invalid
-                       (formData.startTime && formData.endTime && new Date(formData.startTime) >= new Date(formData.endTime))
-                   }
-                   className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3 text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-300 rounded-lg text-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ..."
-                 >
-                   {isSubmitting ? (<>{/* Spinner */} Submitting...</> ) : ( "Submit Booking Request" )}
-                 </button>
-               </div>
-             </form>
+              {/* Submit Button Area */}
+              <div className="pt-6 border-t border-gray-200 text-center">
+                <button
+                  type="submit"
+                  // Disable button if essential data is loading, conflicts exist, or already submitting
+                  disabled={
+                    isSubmitting || 
+                    isLoadingAuditoriums || 
+                    isLoadingDepartments || 
+                    isCheckingConflicts ||
+                    conflicts.length > 0 ||
+                    !!auditoriumFetchError || 
+                    !!departmentFetchError || 
+                    !!conflictError
+                  }
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3 text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-300 rounded-lg text-lg font-semibold transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                >
+                  {isSubmitting ? (
+                    <>
+                      {/* Loading Spinner */}
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : conflicts.length > 0 ? (
+                    "Time Slot Unavailable"
+                  ) : (
+                    "Submit Booking Request"
+                  )}
+                </button>
+              </div>
+              {/* End Submit Button */}
+            </form>
+            {/* End Form Element */}
           </div>
         </div>
       </div>

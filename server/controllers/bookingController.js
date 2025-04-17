@@ -158,60 +158,159 @@ exports.checkAvailability = async (req, res, next) => {
     const { auditoriumId, startTime, endTime, excludeBookingId } = req.query; // Added excludeBookingId
     console.log(`[API Call] GET /check-availability | Auditorium: ${auditoriumId}, Start: ${startTime}, End: ${endTime}, Exclude: ${excludeBookingId || 'N/A'}`);
 
-    // --- Validation ---
-    if (!auditoriumId || !startTime || !endTime) { return res.status(400).json({ success: false, message: 'Missing required query parameters: auditoriumId, startTime, endTime.' }); }
-    if (!mongoose.Types.ObjectId.isValid(auditoriumId)) { return res.status(400).json({ success: false, message: 'Invalid Auditorium ID format.' }); }
-    if (excludeBookingId && !mongoose.Types.ObjectId.isValid(excludeBookingId)) { return res.status(400).json({ success: false, message: 'Invalid excludeBookingId format.' }); }
+  // --- Validation ---
+  if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {
+    return res.status(400).json({ success: false, message: 'Invalid Auditorium ID format.' });
+  }
+  if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || year < 1970 || year > 2100) {
+    return res.status(400).json({ success: false, message: 'Valid year and month (1-12) query parameters are required.' });
+  }
 
-    let startDateTimeJS, endDateTimeJS;
-    try {
-        const startLuxon = DateTime.fromISO(startTime); const endLuxon = DateTime.fromISO(endTime);
-        if (!startLuxon.isValid || !endLuxon.isValid) throw new Error('Invalid ISO date format.');
-        startDateTimeJS = startLuxon.toJSDate(); endDateTimeJS = endLuxon.toJSDate();
-        if (startDateTimeJS >= endDateTimeJS) return res.status(400).json({ success: false, message: 'End time must be strictly after start time.' });
-    } catch (e) { console.error("Date parsing error:", e.message); return res.status(400).json({ success: false, message: 'Invalid startTime or endTime format. Use full ISO 8601 format.' }); }
+  try {
+    // --- Calculate Date Range (in UTC) ---
+    const startOfMonthUTC = DateTime.local(year, month, 1, { zone: istTimezone }).startOf('month').toUTC().toJSDate();
+    const endOfMonthUTC = DateTime.local(year, month, 1, { zone: istTimezone }).endOf('month').toUTC().toJSDate();
 
-    try {
-        // Build Conflict Query
-        const conflictQuery = {
-            auditorium: auditoriumId,
-            status: 'approved',
-            startTime: { $lt: endDateTimeJS },
-            endTime: { $gt: startDateTimeJS },
-        };
-        // *** Exclude the specific booking ID if provided ***
-        if (excludeBookingId) {
-            conflictQuery._id = { $ne: excludeBookingId }; // $ne means "not equal"
-            console.log(`[DEBUG] Excluding booking ${excludeBookingId} from conflict check.`);
-        } else {
-            console.log(`[DEBUG] No booking ID excluded.`);
-        }
+    console.log(`[DEBUG] Availability query UTC Range: ${startOfMonthUTC.toISOString()} - ${endOfMonthUTC.toISOString()}`);
 
-        const conflictingBooking = await Booking.findOne(conflictQuery)
-            .populate('department', 'name')
-            .populate('user', 'username')
-            .select('eventName startTime endTime department user _id') // Ensure _id is selected for check below
-            .lean();
+    // --- Fetch Approved Bookings Overlapping the Month ---
+    const bookedSlots = await Booking.find({
+      auditorium: auditoriumId,
+      status: 'approved', // Only interested in confirmed bookings
+      startTime: { $lt: endOfMonthUTC }, // Starts before month ends
+      endTime: { $gt: startOfMonthUTC } // Ends after month starts
+    })
+    .select('startTime endTime -_id') // Only fetch the start and end times, exclude the default _id
+    .lean(); // Use lean for performance as we only need plain JS objects
 
-        if (conflictingBooking) {
-             console.log(`[Conflict Found] Audi ${auditoriumId} conflicts with ${conflictingBooking._id}`);
-             res.status(200).json({
-                success: true, available: false,
-                conflictingBooking: {
-                    _id: conflictingBooking._id,
-                    eventName: conflictingBooking.eventName,
-                    department: conflictingBooking.department?.name || 'N/A',
-                    user: conflictingBooking.user?.username || 'N/A',
-                    startTime: conflictingBooking.startTime.toISOString(),
-                    endTime: conflictingBooking.endTime.toISOString()
-                },
-                message: `Time slot conflicts with '${conflictingBooking.eventName}'.`
-            });
-        } else {
-            console.log(`[Availability Check] Audi ${auditoriumId} AVAILABLE ${startTime} - ${endTime}`);
-            res.status(200).json({ success: true, available: true, message: 'Time slot is available.' });
-        }
-    } catch (error) { console.error(`[Error] Checking avail for Audi ${auditoriumId}:`, error); res.status(500).json({ success: false, message: 'Server error checking availability.' }); }
+    res.status(200).json({
+      success: true,
+      message: `Availability fetched for month ${year}-${String(month).padStart(2, '0')}`,
+      count: bookedSlots.length,
+      data: bookedSlots, // Array of {startTime, endTime} objects
+    });
+
+  } catch (error) {
+    console.error(`[Error] Fetching availability for Auditorium ${auditoriumId}, ${month}/${year}:`, error);
+    res.status(500).json({ success: false, message: 'Server error retrieving auditorium availability.' });
+  }
 };
 
-// --- END of Controller ---
+/**
+ * @desc    Get current and upcoming events
+ * @route   GET /api/bookings/public/events
+ * @access  Public
+ */
+exports.getPublicEvents = async (req, res) => {
+  try {
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const events = await Booking.find({
+      status: 'approved',
+      $or: [
+        // Current events (happening now)
+        {
+          startTime: { $lte: now },
+          endTime: { $gte: now }
+        },
+        // Upcoming events (within next 7 days)
+        {
+          startTime: { $gt: now, $lt: nextWeek }
+        }
+      ]
+    })
+    .sort({ startTime: 1 })
+    .populate('auditorium', 'name')
+    .select('eventName startTime endTime auditorium eventImages'); // Added eventImages field
+
+    console.log('Found events:', events); // Debug log
+
+    res.status(200).json({
+      success: true,
+      data: events
+    });
+
+  } catch (error) {
+    console.error("[Error] Fetch public events failed:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching events' 
+    });
+  }
+};
+
+/**
+ * @desc    Check for conflicts with existing bookings
+ * @route   POST /api/bookings/conflicts
+ * @access  Private (User - needs login)
+ */
+exports.checkBookingConflicts = async (req, res) => {
+  try {
+    const { auditoriumId, startTime, endTime } = req.body;
+
+    // Basic validation
+    if (!auditoriumId || !startTime || !endTime) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Auditorium ID, start time, and end time are required.' 
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid Auditorium ID format.' 
+      });
+    }
+
+    // Convert to Date objects
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+
+    // Check for valid dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid date format. Use valid ISO format.' 
+      });
+    }
+
+    if (startDate >= endDate) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'End time must be strictly after start time.' 
+      });
+    }
+
+    // Check for conflicts with approved bookings
+    const conflict = await Booking.findOne({
+      auditorium: auditoriumId,
+      status: 'approved',
+      startTime: { $lt: endDate },
+      endTime: { $gt: startDate }
+    });
+
+    if (conflict) {
+      return res.status(200).json({
+        success: true,
+        hasConflict: true,
+        message: 'The selected time slot conflicts with an existing booking.'
+      });
+    }
+
+    // No conflicts found
+    return res.status(200).json({
+      success: true,
+      hasConflict: false,
+      message: 'The selected time slot is available.'
+    });
+
+  } catch (error) {
+    console.error('[Error] Check booking conflicts failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error checking booking conflicts.' 
+    });
+  }
+};
