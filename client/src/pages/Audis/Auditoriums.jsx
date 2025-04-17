@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import KSAudi from "../../assets/ksaudi/ksaudi1.jpg";
 import PEB from "../../assets/peb/PEB1.jpg";
 import bblock from "../../assets/bblock/bblock1.jpg";
+import apj from "../../assets/apj/apj1.jpg"; // Assuming you have an image for APJ Auditorium
 
 const Auditoriums = () => {
   const auditoriums = [
@@ -25,7 +26,7 @@ const Auditoriums = () => {
       description: "Named after the former president, this hall hosts inspiring lectures.",
       capacity: "300 Seats",
       link: "/apj-auditorium",
-      image: "https://images.unsplash.com/photo-1526041092674-11dc96445936?auto=format&fit=crop&q=80"
+      image: apj
     },
     {
       name: "PEB Training Hall",
