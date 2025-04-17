@@ -145,13 +145,11 @@ function BookAuditorium({ userEmail = "" }) {
 
   /** Fetches existing bookings to check for conflicts */
   const checkBookingConflicts = useCallback(async () => {
-    // Reset conflict states
     setConflicts([]);
     setConflictError("");
     
-    // Do nothing if we don't have all required fields
     if (!formData.auditoriumId || !formData.startTime || !formData.endTime) {
-      return;
+        return;
     }
     
     setIsCheckingConflicts(true);
@@ -159,57 +157,57 @@ function BookAuditorium({ userEmail = "" }) {
     const startDate = new Date(formData.startTime);
     const endDate = new Date(formData.endTime);
     
-    // Check for valid dates before proceeding
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate >= endDate) {
-      // Silent return, as this is handled in form validation
-      setIsCheckingConflicts(false);
-      return;
+        setIsCheckingConflicts(false);
+        return;
     }
-    
-    // Construct the API URL with query parameters
-    const apiUrl = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/conflicts`);
-    apiUrl.searchParams.append('auditorium', formData.auditoriumId);
-    apiUrl.searchParams.append('startTime', startDate.toISOString());
-    apiUrl.searchParams.append('endTime', endDate.toISOString());
-    
-    console.log("[API Call] Checking booking conflicts:", apiUrl.toString());
     
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error("Authentication token missing. Please log in again.");
-      }
-      
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            throw new Error("Authentication token missing. Please log in again.");
         }
-      });
-      
-      if (!response.ok) {
-        let errorMsg = `Conflict check failed (${response.status})`;
-        try {
-          const data = await response.json();
-          errorMsg = data.message || errorMsg;
-        } catch (e) { /* ignore parse error */ }
-        throw new Error(errorMsg);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setConflicts(data.data || []);
-      } else {
-        throw new Error(data.message || "Failed to check for booking conflicts");
-      }
+        
+        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/check-availability`;
+        const queryParams = new URLSearchParams({
+            auditoriumId: formData.auditoriumId,
+            startTime: startDate.toISOString(),
+            endTime: endDate.toISOString(),
+            year: startDate.getFullYear(),
+            month: startDate.getMonth() + 1 // JavaScript months are 0-based
+        });
+
+        const response = await fetch(`${apiUrl}?${queryParams}`, {
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || `Check failed (${response.status})`);
+        }
+        
+        if (data.success) {
+            setIsSlotAvailable(!data.hasConflict);
+            if (data.hasConflict && data.conflictingBooking) {
+                setConflicts([data.conflictingBooking]);
+            } else {
+                setConflicts([]);
+            }
+        } else {
+            throw new Error(data.message || "Failed to check availability");
+        }
     } catch (err) {
-      console.error("Conflict check error:", err);
-      setConflictError(err.message || "Could not check for booking conflicts.");
+        console.error("Availability check error:", err);
+        setConflictError(err.message || "Could not check availability");
+        setConflicts([]);
     } finally {
-      setIsCheckingConflicts(false);
+        setIsCheckingConflicts(false);
     }
-  }, [formData.auditoriumId, formData.startTime, formData.endTime]); // Dependencies
+}, [formData.auditoriumId, formData.startTime, formData.endTime]);
 
   // --- Effect Hooks ---
 
@@ -256,32 +254,59 @@ function BookAuditorium({ userEmail = "" }) {
 
   // --- Availability Check Logic ---
   const checkSlotAvailability = useCallback(async (auditoriumId, startTimeStr, endTimeStr) => {
-    setIsSlotAvailable(true); setConflictingBookingDetails(null); setAvailabilityError(""); // Reset first
-    if (!auditoriumId || !startTimeStr || !endTimeStr) { return; }
-    let startDateTime, endDateTime;
-    try {
-      startDateTime = new Date(startTimeStr); endDateTime = new Date(endTimeStr);
-      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) throw new Error("Invalid date/time format.");
-      if (startDateTime >= endDateTime) throw new Error("End time must be after start time.");
-    } catch (dateError) { console.warn("Avail check skip:", dateError.message); setAvailabilityError(dateError.message); setIsSlotAvailable(false); return; }
-    const startTimeISO = startDateTime.toISOString(); const endTimeISO = endDateTime.toISOString();
-    console.log(`Checking: Audi=${auditoriumId}, Start=${startTimeISO}, End=${endTimeISO}`);
+    setIsSlotAvailable(true);
+    setConflictingBookingDetails(null);
+    setAvailabilityError("");
+
+    if (!auditoriumId || !startTimeStr || !endTimeStr) {
+        return;
+    }
+
     setIsCheckingAvailability(true);
+
     try {
-      const token = localStorage.getItem('authToken'); if (!token) throw new Error("Authentication required.");
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/check-availability`;
-      const queryParams = new URLSearchParams({ auditoriumId, startTime: startTimeISO, endTime: endTimeISO });
-      const response = await fetch(`${apiUrl}?${queryParams.toString()}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', }, });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.message || `Check failed (Status ${response.status})`);
-      setIsSlotAvailable(data.available);
-      if (!data.available && data.conflictingBooking) { setConflictingBookingDetails(data.conflictingBooking); }
-      else { setConflictingBookingDetails(null); }
-       setAvailabilityError(""); // Clear error on success
+        const token = localStorage.getItem('authToken');
+        if (!token) throw new Error("Authentication required.");
+
+        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/check-availability`;
+        const queryParams = new URLSearchParams({
+            auditoriumId,
+            startTime: startTimeStr,
+            endTime: endTimeStr
+        });
+
+        const response = await fetch(`${apiUrl}?${queryParams}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || `Check failed (${response.status})`);
+        }
+
+        setIsSlotAvailable(data.available);
+        if (data.hasConflict && data.conflictingBooking) {
+            setConflictingBookingDetails(data.conflictingBooking);
+            setConflicts([data.conflictingBooking]);
+        } else {
+            setConflictingBookingDetails(null);
+            setConflicts([]);
+        }
+        setConflictError("");
+
     } catch (err) {
-      console.error("Avail check error:", err); setAvailabilityError(err.message || "Could not verify availability."); setIsSlotAvailable(false); setConflictingBookingDetails(null);
-    } finally { setIsCheckingAvailability(false); }
-  }, []);
+        console.error("Availability check error:", err);
+        setConflictError(err.message || "Could not check availability");
+        setIsSlotAvailable(false);
+        setConflicts([]);
+    } finally {
+        setIsCheckingAvailability(false);
+    }
+}, []);
 
   const debouncedCheckAvailability = useMemo(() => debounce(checkSlotAvailability, 750), [checkSlotAvailability]);
 
@@ -344,7 +369,19 @@ function BookAuditorium({ userEmail = "" }) {
               <InputField label="Event Name" name="eventName" value={formData.eventName} onChange={handleChange} disabled={isSubmitting} required={true} />
               <div> {/* Department Select */}
                 <label htmlFor="departmentId" className="block text-sm font-semibold text-gray-700 mb-1"> Organizing Department <span className="text-red-500 ml-1">*</span> </label>
-                <select id="departmentId" name="departmentId" value={formData.departmentId} onChange={handleChange} required className={`w-full border px-3 py-2 rounded ... ${departmentFetchError ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoadingDepartments || !!departmentFetchError || departments.length === 0 || isSubmitting}>
+                <select 
+                  id="departmentId" 
+                  name="departmentId" 
+                  value={formData.departmentId} 
+                  onChange={handleChange} 
+                  required 
+                  className={`w-full border px-3 py-2 rounded-md text-sm ${
+                    departmentFetchError ? 'border-red-500' : 'border-gray-300'
+                  } focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 
+                    disabled:bg-gray-50 disabled:cursor-not-allowed transition-colors
+                    hover:border-red-400`}
+                  disabled={isLoadingDepartments || !!departmentFetchError || departments.length === 0 || isSubmitting}
+                >
                   <option value="" disabled> {isLoadingDepartments ? "Loading..." : departmentFetchError ? "Error Loading" : departments.length === 0 ? "No Depts" : "-- Select --"} </option>
                   {!isLoadingDepartments && !departmentFetchError && departments.map((dept) => (<option key={dept._id} value={dept._id}>{dept.name} {dept.code ? `(${dept.code})` : ''}</option>))}
                 </select>
@@ -354,7 +391,19 @@ function BookAuditorium({ userEmail = "" }) {
                 <label htmlFor="auditoriumId" className="block text-sm font-semibold text-gray-700 mb-1"> 
                   Auditorium <span className="text-red-500 ml-1">*</span> 
                 </label>
-                <select id="auditoriumId" name="auditoriumId" value={formData.auditoriumId} onChange={handleChange} required className={`w-full border px-3 py-2 rounded ... ${auditoriumFetchError ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoadingAuditoriums || !!auditoriumFetchError || auditoriums.length === 0 || isSubmitting}>
+                <select 
+                  id="auditoriumId" 
+                  name="auditoriumId" 
+                  value={formData.auditoriumId} 
+                  onChange={handleChange} 
+                  required 
+                  className={`w-full border px-3 py-2 rounded-md text-sm ${
+                    auditoriumFetchError ? 'border-red-500' : 'border-gray-300'
+                  } focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 
+                    disabled:bg-gray-50 disabled:cursor-not-allowed transition-colors
+                    hover:border-red-400`}
+                  disabled={isLoadingAuditoriums || !!auditoriumFetchError || auditoriums.length === 0 || isSubmitting}
+                >
                   <option value="" disabled> {isLoadingAuditoriums ? "Loading..." : auditoriumFetchError ? "Error Loading" : auditoriums.length === 0 ? "No Audis" : "-- Select --"} </option>
                   {!isLoadingAuditoriums && !auditoriumFetchError && auditoriums.map((audi) => (<option key={audi._id} value={audi._id}>{audi.name} ({audi.location || 'N/A'}) - Cap: {audi.capacity || '?'}</option>))}
                 </select>
@@ -409,29 +458,50 @@ function BookAuditorium({ userEmail = "" }) {
               )}
               
               {conflicts.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                   <div className="flex items-center">
-                    <svg className="h-5 w-5 text-red-500 mr-2" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    <svg className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-red-800 font-medium">Time slot unavailable</span>
+                    <span className="text-blue-800 font-medium">Schedule Overlap Detected</span>
                   </div>
-                  <p className="text-sm text-red-600 mt-1">
-                    The requested time slot conflicts with {conflicts.length} existing booking(s).
+                  <p className="text-sm text-blue-700 mt-2">
+                    The requested time slot overlaps with existing bookings:
                   </p>
-                  <ul className="mt-2 text-xs space-y-1 text-red-700">
+                  <ul className="mt-3 space-y-2 text-sm">
                     {conflicts.slice(0, 3).map((booking, idx) => (
-                      <li key={idx} className="flex flex-col sm:flex-row sm:items-center">
-                        <span className="font-medium">{booking.eventName}</span>
-                        <span className="sm:ml-2 text-red-600">
-                          ({new Date(booking.startTime).toLocaleString()} - {new Date(booking.endTime).toLocaleString()})
-                        </span>
+                      <li key={idx} className="bg-white bg-opacity-50 rounded p-2 border border-blue-100">
+                        <div className="font-medium text-blue-900">{booking.eventName}</div>
+                        <div className="text-blue-600 text-xs mt-1">
+                          {new Date(booking.startTime).toLocaleDateString('en-US', { 
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                          {' '}
+                          {new Date(booking.startTime).toLocaleTimeString('en-US', { 
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })} 
+                          {' - '}
+                          {new Date(booking.endTime).toLocaleTimeString('en-US', { 
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
                       </li>
                     ))}
-                    {conflicts.length > 3 && (
-                      <li>...and {conflicts.length - 3} more</li>
-                    )}
                   </ul>
+                  {conflicts.length > 3 && (
+                    <p className="text-sm text-blue-600 mt-2 italic">
+                      ...and {conflicts.length - 3} more overlapping events
+                    </p>
+                  )}
+                  <p className="text-sm text-blue-700 mt-3">
+                    Please select a different time slot to proceed with your booking.
+                  </p>
                 </div>
               )}
               
