@@ -166,50 +166,30 @@ exports.sendBookingRequestEmail = async (userEmail, booking, auditorium, departm
         const status = 'PENDING';
         
         const mailOptions = {
-            from: `"Auditorium Booking System" <${emailUser}>`,
+            from: `"Auditorium Management" <${emailUser}>`,
             to: userEmail,
-            subject: `⏳ PENDING: Auditorium Booking (#${partialBookingId})`,
-            text: `Hi there,
-
-Your request to book ${auditorium.name} for the event "${booking.eventName}" (Department: ${department.name}) has been submitted successfully and is now PENDING.
-
-Booking Details:
-
-ID: ...${partialBookingId}
-Event: ${booking.eventName}
-Description: ${booking.description || 'N/A'}
-Auditorium: ${auditorium.name} (${auditorium.location})
-Department: ${department.name}
-Start Time: ${startTimeIST}
-End Time: ${endTimeIST}
-Status: ${status}
-
-You will receive another email once your request is reviewed by the administrator (approved or rejected).
-
-Thanks,
-The Auditorium Management Team`,
+            subject: `📝 Auditorium Booking Request Received`,
             html: `
-                <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-                    <p>Hi there,</p>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <p>Dear ${booking.user.username || 'Valued User'},</p>
                     
-                    <p>Your request to book <strong>${auditorium.name}</strong> for the event "<strong>${booking.eventName}</strong>" (Department: ${department.name}) has been submitted successfully and is now <strong style="color: #ffc107;">${status}</strong>.</p>
+                    <p>Your request to book an auditorium has been received and is currently under review.</p>
                     
-                    <p><strong>Booking Details:</strong></p>
-                    
-                    <ul style="list-style: none; padding-left: 0;">
-                        <li><strong>ID:</strong> ...${partialBookingId}</li>
-                        <li><strong>Event:</strong> ${booking.eventName}</li>
-                        <li><strong>Description:</strong> ${booking.description || 'N/A'}</li>
-                        <li><strong>Auditorium:</strong> ${auditorium.name} (${auditorium.location})</li>
-                        <li><strong>Department:</strong> ${department.name}</li>
-                        <li><strong>Start Time:</strong> ${startTimeIST}</li>
-                        <li><strong>End Time:</strong> ${endTimeIST}</li>
-                        <li><strong>Status:</strong> <span style="color: #ffc107; font-weight: bold;">${status}</span></li>
-                    </ul>
-                    
-                    <p>You will receive another email once your request is reviewed by the administrator (approved or rejected).</p>
-                    
-                    <p>Thanks,<br>The Auditorium Management Team</p>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="color: #444; margin-top: 0;">Event Details</h3>
+                        <ul style="list-style: none; padding-left: 0;">
+                            <li><strong>Event:</strong> ${booking.eventName}</li>
+                            <li><strong>Venue:</strong> ${auditorium.name}</li>
+                            <li><strong>Department:</strong> ${department.name}</li>
+                            <li><strong>Date & Time:</strong> ${startTimeIST} - ${endTimeIST}</li>
+                        </ul>
+                    </div>
+
+                    <p>Our administrative team will review your request and notify you of their decision shortly. Please note that all bookings are subject to availability and approval.</p>
+
+                    <p>For any queries regarding your booking request, please contact the administration office.</p>
+
+                    <p style="margin-top: 30px;">Best regards,<br>Auditorium Management Team</p>
                 </div>
             `
         };
@@ -254,46 +234,33 @@ exports.sendBookingApprovalEmail = async (userEmail, bookingDetails, auditoriumD
     const status = 'APPROVED'; // Explicitly set for clarity
 
     const mailOptions = {
-      from: `"Auditorium Booking System" <${emailUser}>`,
-      to: userEmail,
-      subject: `✅ APPROVED: Auditorium Booking (#${partialBookingId})`,
-      // --- Plain Text Version ---
-      text: `Hi there,\n\n` +
-            `Good news! Your booking request for "${eventName}" ` +
-            `(Department: ${departmentName}) in the "${auditoriumName}" has been APPROVED.\n\n` +
-            `Approved Booking Details:\n` +
-            `--------------------\n` +
-            `ID: ...${partialBookingId}\n` +
-            `Event: ${eventName}\n` +
-            `Auditorium: ${auditoriumName} (${auditoriumLocation})\n` +
-            `Department: ${departmentName}\n` +
-            `Start Time: ${startTimeIST}\n` +
-            `End Time: ${endTimeIST}\n` +
-            `Status: ${status}\n` +
-            `--------------------\n\n` +
-            `Please ensure you adhere to all auditorium usage policies.\n\n` +
-            `Thanks,\nThe Auditorium Management Team`,
-      // --- HTML Version ---
+      subject: `✅ Auditorium Booking Approved`,
       html: `
-        <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <p style="color: #28a745; font-weight: bold;">Hi there,</p>
-          <p>Good news! Your booking request for the event "<strong>${eventName}</strong>" (Department: <strong>${departmentName}</strong>) in the <strong>${auditoriumName}</strong> has been <strong style="color: #28a745;">${status}</strong>.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 18px; font-weight: bold;">Approved Booking Details:</p>
-          <ul style="list-style: none; padding-left: 0;">
-            <li><strong>ID:</strong> ...${partialBookingId}</li>
-            <li><strong>Event:</strong> ${eventName}</li>
-            <li><strong>Auditorium:</strong> ${auditoriumName} (${auditoriumLocation})</li>
-            <li><strong>Department:</strong> ${departmentName}</li>
-            <li><strong>Start Time:</strong> ${startTimeIST}</li>
-            <li><strong>End Time:</strong> ${endTimeIST}</li>
-            <li><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">${status}</span></li>
-          </ul>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p>Please ensure you adhere to all auditorium usage policies.</p>
-          <p>Thanks,<br>The Auditorium Management Team</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <p>Dear ${bookingDetails.user?.username || 'Valued User'},</p>
+            
+            <p>We are pleased to inform you that your auditorium booking request has been <strong style="color: #28a745;">approved</strong>.</p>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 15px 0;">
+                <h3 style="color: #444; margin-top: 0;">Event Details</h3>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li><strong>Event:</strong> ${eventName}</li>
+                    <li><strong>Venue:</strong> ${auditoriumName} (${auditoriumLocation})</li>
+                    <li><strong>Department:</strong> ${departmentName}</li>
+                    <li><strong>Date & Time:</strong> ${startTimeIST} - ${endTimeIST}</li>
+                </ul>
+            </div>
+
+            <p>Please ensure to:</p>
+            <ul>
+                <li>Arrive at least 15 minutes before your scheduled time</li>
+                <li>Follow all auditorium usage guidelines</li>
+                <li>Contact administration for any technical requirements</li>
+            </ul>
+
+            <p style="margin-top: 30px;">Best regards,<br>Auditorium Management Team</p>
         </div>
-      `,
+      `
     };
 
     // --- Send Email ---
@@ -333,60 +300,38 @@ exports.sendBookingRejectionEmail = async (userEmail, bookingDetails, auditorium
     const startTimeIST = formatDateTimeIST(bookingDetails.startTime);
     const endTimeIST = formatDateTimeIST(bookingDetails.endTime);
     const auditoriumName = auditoriumDetails.name || 'N/A';
-    // auditoriumLocation might not be needed for rejection, but keep if useful
-    // const auditoriumLocation = auditoriumDetails.location || 'N/A';
     const departmentName = departmentDetails.name || 'N/A';
     const eventName = bookingDetails.eventName || 'N/A';
     const status = 'REJECTED';
     const reason = rejectionReason.trim(); // Ensure trimmed reason
 
     const mailOptions = {
-      from: `"Auditorium Booking System" <${emailUser}>`,
-      to: userEmail,
-      subject: `❌ REJECTED: Auditorium Booking Request (#${partialBookingId})`,
-      // --- Plain Text Version ---
-      text: `Hi there,\n\n` +
-            `Unfortunately, your booking request for "${eventName}" ` +
-            `(Department: ${departmentName}) in the "${auditoriumName}" has been REJECTED.\n\n` +
-            `Reason for Rejection:\n${reason}\n\n` +
-            `Rejected Request Details:\n` +
-            `--------------------\n` +
-            `ID: ...${partialBookingId}\n` +
-            `Event: ${eventName}\n` +
-            `Auditorium: ${auditoriumName}\n` +
-            `Department: ${departmentName}\n` +
-            `Requested Start: ${startTimeIST}\n` +
-            `Requested End: ${endTimeIST}\n` +
-            `Status: ${status}\n` +
-            `--------------------\n\n` +
-            `Please contact the administration if you have further questions or wish to discuss alternative options.\n\n` +
-            `Thanks,\nThe Auditorium Management Team`,
-      // --- HTML Version ---
+      subject: `Auditorium Booking Request Update`,
       html: `
-        <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <p style="color: #dc3545; font-weight: bold;">Hi there,</p>
-          <p>Unfortunately, your booking request for the event "<strong>${eventName}</strong>" (Department: <strong>${departmentName}</strong>) in the <strong>${auditoriumName}</strong> has been <strong style="color: #dc3545;">${status}</strong>.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 18px; font-weight: bold;">Reason for Rejection:</p>
-          <blockquote style="margin: 10px 0 20px 10px; padding: 10px 15px; border-left: 4px solid #ffc107; background-color: #fffbe4; font-style: italic;">
-            ${reason}
-          </blockquote>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 18px; font-weight: bold;">Rejected Request Details:</p>
-          <ul style="list-style: none; padding-left: 0;">
-            <li><strong>ID:</strong> ...${partialBookingId}</li>
-            <li><strong>Event:</strong> ${eventName}</li>
-            <li><strong>Auditorium:</strong> ${auditoriumName}</li>
-            <li><strong>Department:</strong> ${departmentName}</li>
-            <li><strong>Requested Start:</strong> ${startTimeIST}</li>
-            <li><strong>Requested End:</strong> ${endTimeIST}</li>
-            <li><strong>Status:</strong> <span style="color: #dc3545; font-weight: bold;">${status}</span></li>
-          </ul>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p>Please contact the administration if you have further questions or wish to discuss alternative options.</p>
-          <p>Thanks,<br>The Auditorium Management Team</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <p>Dear ${bookingDetails.user?.username || 'Valued User'},</p>
+            
+            <p>We regret to inform you that we are unable to accommodate your auditorium booking request at this time.</p>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 15px 0;">
+                <h3 style="color: #444; margin-top: 0;">Event Details</h3>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li><strong>Event:</strong> ${eventName}</li>
+                    <li><strong>Venue:</strong> ${auditoriumName}</li>
+                    <li><strong>Department:</strong> ${departmentName}</li>
+                    <li><strong>Requested Date & Time:</strong> ${startTimeIST} - ${endTimeIST}</li>
+                </ul>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <p style="color: #856404; margin: 0;"><strong>Reason:</strong> ${reason}</p>
+            </div>
+
+            <p>You are welcome to submit a new booking request for an alternative date or time. If you have any questions, please don't hesitate to contact the administration office.</p>
+
+            <p style="margin-top: 30px;">Best regards,<br>Auditorium Management Team</p>
         </div>
-      `,
+      `
     };
 
     // --- Send Email ---
@@ -396,6 +341,117 @@ exports.sendBookingRejectionEmail = async (userEmail, bookingDetails, auditorium
 
   } catch (error) {
     console.error(`[Email Error] Failed sending booking rejection email to ${userEmail} for booking ${bookingDetails?._id}:`, error.message || error);
+    // return; // Indicate failure without throwing
+  }
+};
+
+// --- Send Booking Request Notification to Admin ---
+/**
+ * Sends an email notifying the admin about a new booking request.
+ * @param {string} adminEmail - The admin's email address.
+ * @param {object} bookingDetails - The populated Booking document.
+ * @param {object} auditoriumDetails - The populated Auditorium document.
+ * @param {object} departmentDetails - The populated Department document.
+ * @returns {Promise<object | void>} Nodemailer info object on success, or void on failure.
+ */
+exports.sendBookingRequestNotificationToAdmin = async (adminEmail, bookingDetails, auditoriumDetails, departmentDetails) => {
+  try {
+    // --- Input Validation ---
+    if (!adminEmail) throw new Error('Admin email is missing');
+    if (!bookingDetails?._id) throw new Error('Booking details missing');
+    if (!auditoriumDetails?.name) throw new Error('Auditorium details missing');
+    if (!departmentDetails?.name) throw new Error('Department details missing');
+
+    const transporter = await createTransporter();
+    const partialBookingId = bookingDetails._id.toString().slice(-6);
+
+    // --- Prepare Email Content ---
+    const startTimeIST = formatDateTimeIST(bookingDetails.startTime);
+    const endTimeIST = formatDateTimeIST(bookingDetails.endTime);
+    const auditoriumName = auditoriumDetails.name;
+    const departmentName = departmentDetails.name;
+    const eventName = bookingDetails.eventName;
+    const userEmail = bookingDetails.user?.email || 'N/A';
+    const userName = bookingDetails.user?.username || 'N/A';
+
+    const mailOptions = {
+      from: `"Auditorium Management System" <${emailUser}>`,
+      to: adminEmail,
+      subject: `🔔 New Booking Request: ${eventName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #dc2626; margin: 0; font-size: 24px;">New Booking Request</h1>
+            <p style="color: #666; margin-top: 5px;">A new auditorium booking request requires your review</p>
+          </div>
+
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 15px 0;">
+            <h2 style="color: #444; margin-top: 0; font-size: 18px;">Event Information</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; width: 140px;"><strong>Event Name:</strong></td>
+                <td style="padding: 8px 0;">${eventName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0;"><strong>Description:</strong></td>
+                <td style="padding: 8px 0;">${bookingDetails.description || 'No description provided'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0;"><strong>Venue:</strong></td>
+                <td style="padding: 8px 0;">${auditoriumName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0;"><strong>Department:</strong></td>
+                <td style="padding: 8px 0;">${departmentName}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background: #fff3cd; padding: 20px; border-radius: 5px; margin: 15px 0;">
+            <h2 style="color: #444; margin-top: 0; font-size: 18px;">Schedule</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; width: 140px;"><strong>Start Time:</strong></td>
+                <td style="padding: 8px 0;">${startTimeIST}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0;"><strong>End Time:</strong></td>
+                <td style="padding: 8px 0;">${endTimeIST}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background: #e8eaf6; padding: 20px; border-radius: 5px; margin: 15px 0;">
+            <h2 style="color: #444; margin-top: 0; font-size: 18px;">Requester Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; width: 140px;"><strong>Name:</strong></td>
+                <td style="padding: 8px 0;">${userName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0;"><strong>Email:</strong></td>
+                <td style="padding: 8px 0;">${userEmail}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-top: 30px; text-align: center;">
+            <p style="color: #666;">Please login to the admin dashboard to review this request.</p>
+            <p style="margin-top: 20px; font-size: 14px; color: #888;">
+              This is an automated message from the Auditorium Management System.<br>
+              Please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Email Sent] Booking request notification to admin: ${adminEmail} | Booking ID: ${bookingDetails._id} | Msg ID: ${info.messageId}`);
+    return info;
+
+  } catch (error) {
+    console.error(`[Email Error] Failed sending booking request notification to admin ${adminEmail} for booking ${bookingDetails?._id}:`, error.message || error);
     // return; // Indicate failure without throwing
   }
 };

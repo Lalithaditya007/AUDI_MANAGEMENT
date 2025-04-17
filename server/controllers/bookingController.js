@@ -13,12 +13,14 @@ const {
   sendBookingRequestEmail,
   sendBookingApprovalEmail,
   sendBookingRejectionEmail,
+  sendBookingRequestNotificationToAdmin  // Add this line
 } = require('../utils/emailService'); // Assuming this path is correct
 
 // --- Constants ---
 const istTimezone = 'Asia/Kolkata';
 const openingHourIST = 9; // Bookings cannot start before 9 AM IST
 const bookingLeadTimeHours = 2; // Bookings must be made at least 2 hours in advance
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL; // Add this to your .env file
 
 // --- Helper: File Cleanup ---
 const cleanupUploadedFileOnError = (file) => {
@@ -33,7 +35,53 @@ const cleanupUploadedFileOnError = (file) => {
 
 /** createBooking */
 exports.createBooking = async (req, res) => {
-    try { const eventImage=req.file?`/uploads/${req.file.filename}`:null; const booking=await Booking.create({eventName:req.body.eventName,description:req.body.description,startTime:req.body.startTime,endTime:req.body.endTime,auditorium:req.body.auditorium,department:req.body.department,user:req.user._id,eventImages:eventImage?[eventImage]:[],status:'pending'}); const populatedBooking=await Booking.findById(booking._id).populate('user', 'email username').populate('auditorium', 'name location').populate('department', 'name'); try { await sendBookingRequestEmail(populatedBooking.user.email, populatedBooking, populatedBooking.auditorium, populatedBooking.department); console.log(`[Email Sent] Booking req confirm sent for ${booking._id}`); } catch (emailError) { console.error(`[Non-critical Error] Email send fail ${booking._id}:`, emailError); } res.status(201).json({success:true, message:'Booking created successfully', data:booking}); } catch (error) { if (req.file) { cleanupUploadedFileOnError(req.file); } console.error("[Error] Create Booking Failed:", error); res.status(500).json({success:false, message: error.message || 'Server error creating booking.'}); }
+    try { 
+        const eventImage=req.file?`/uploads/${req.file.filename}`:null; 
+        const booking=await Booking.create({
+            eventName:req.body.eventName,
+            description:req.body.description,
+            startTime:req.body.startTime,
+            endTime:req.body.endTime,
+            auditorium:req.body.auditorium,
+            department:req.body.department,
+            user:req.user._id,
+            eventImages:eventImage?[eventImage]:[],
+            status:'pending'
+        }); 
+        const populatedBooking=await Booking.findById(booking._id)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name location')
+            .populate('department', 'name'); 
+        try { 
+            await sendBookingRequestEmail(populatedBooking.user.email, populatedBooking, populatedBooking.auditorium, populatedBooking.department); 
+            console.log(`[Email Sent] Booking req confirm sent for ${booking._id}`); 
+        } catch (emailError) { 
+            console.error(`[Non-critical Error] Email send fail ${booking._id}:`, emailError); 
+        }
+
+        // Send notification to admin
+        if (ADMIN_EMAIL) {
+            try {
+                await sendBookingRequestNotificationToAdmin(
+                    ADMIN_EMAIL,
+                    populatedBooking,
+                    populatedBooking.auditorium,
+                    populatedBooking.department
+                );
+            } catch (emailError) {
+                console.error('[Admin Notification Failed]', emailError);
+                // Don't return error to client if admin notification fails
+            }
+        } else {
+            console.warn('[Warning] Admin email not configured. Skipping admin notification.');
+        }
+
+        res.status(201).json({success:true, message:'Booking created successfully', data:booking}); 
+    } catch (error) { 
+        if (req.file) { cleanupUploadedFileOnError(req.file); } 
+        console.error("[Error] Create Booking Failed:", error); 
+        res.status(500).json({success:false, message: error.message || 'Server error creating booking.'}); 
+    }
 };
 
 /** getMyBookings */

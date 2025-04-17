@@ -264,7 +264,7 @@ function BookAuditorium({ userEmail = "" }) {
                 </select>
                 {auditoriumFetchError && <p className="text-red-600 text-xs mt-1">{auditoriumFetchError}</p>}
               </div>
-              <TextAreaField label="Event Description" name="description" value={formData.description} onChange={handleChange} disabled={isSubmitting} required={false} />
+              <TextAreaField label="Event Description" name="description" value={formData.description} onChange={handleChange} disabled={isSubmitting} required={true} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"> {/* Date Inputs */}
                  <InputField label="Start Date & Time" name="startTime" type="datetime-local" value={formData.startTime} onChange={handleChange} disabled={isSubmitting} required={true} min={getMinDateTimeLocal()} />
                  <InputField label="End Date & Time" name="endTime" type="datetime-local" value={formData.endTime} onChange={handleChange} disabled={isSubmitting} required={true} min={formData.startTime || getMinDateTimeLocal()} />
