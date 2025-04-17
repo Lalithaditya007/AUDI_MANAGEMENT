@@ -537,7 +537,7 @@ const ManageBookings = () => {
                           {/* Header: Event Name & Status */}
                           <div className="flex flex-col sm:flex-row justify-between items-start gap-1">
                             <h2 className="text-xl font-semibold text-gray-800 truncate pr-2" title={booking.eventName}>
-                              {booking.eventName || <span className="italic text-gray-400">Untitled Event</span>}
+                              {booking.eventName || <span className="it alic text-gray-400">Untitled Event</span>}
                             </h2>
                             <span
                               className={`flex-shrink-0 mt-1 sm:mt-0 px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${booking.status === "approved" ? "bg-green-100 text-green-800 border-green-200" :
