@@ -351,57 +351,44 @@ function BookAuditorium({ userEmail = "" }) {
                 {departmentFetchError && <p className="text-red-600 text-xs mt-1">{departmentFetchError}</p>}
               </div>
               <div> {/* Auditorium Select */}
-                <label htmlFor="auditoriumId" className="block text-sm font-semibold text-gray-700 mb-1"> Auditorium <span className="text-red-500 ml-1">*</span> </label>
+                <label htmlFor="auditoriumId" className="block text-sm font-semibold text-gray-700 mb-1"> 
+                  Auditorium <span className="text-red-500 ml-1">*</span> 
+                </label>
                 <select id="auditoriumId" name="auditoriumId" value={formData.auditoriumId} onChange={handleChange} required className={`w-full border px-3 py-2 rounded ... ${auditoriumFetchError ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoadingAuditoriums || !!auditoriumFetchError || auditoriums.length === 0 || isSubmitting}>
                   <option value="" disabled> {isLoadingAuditoriums ? "Loading..." : auditoriumFetchError ? "Error Loading" : auditoriums.length === 0 ? "No Audis" : "-- Select --"} </option>
                   {!isLoadingAuditoriums && !auditoriumFetchError && auditoriums.map((audi) => (<option key={audi._id} value={audi._id}>{audi.name} ({audi.location || 'N/A'}) - Cap: {audi.capacity || '?'}</option>))}
                 </select>
                 {auditoriumFetchError && <p className="text-red-600 text-xs mt-1">{auditoriumFetchError}</p>}
               </div>
-<<<<<<< HEAD
-              <TextAreaField label="Event Description" name="description" value={formData.description} onChange={handleChange} disabled={isSubmitting} required={true} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"> {/* Date Inputs */}
-                 <InputField label="Start Date & Time" name="startTime" type="datetime-local" value={formData.startTime} onChange={handleChange} disabled={isSubmitting} required={true} min={getMinDateTimeLocal()} />
-                 <InputField label="End Date & Time" name="endTime" type="datetime-local" value={formData.endTime} onChange={handleChange} disabled={isSubmitting} required={true} min={formData.startTime || getMinDateTimeLocal()} />
-=======
-
-              {/* End Auditorium Select */}
-
-              {/* Event Description Text Area */}
-              <TextAreaField
-                label="Event Description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                required={false} // Description is optional
+              <TextAreaField 
+                label="Event Description" 
+                name="description" 
+                value={formData.description} 
+                onChange={handleChange} 
+                disabled={isSubmitting} 
+                required={true} // Description is optional
               />
-
-              {/* Start/End Date & Time Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <div>
-                  <InputField
-                    label="Start Date & Time"
-                    name="startTime"
-                    type="datetime-local"
-                    value={formData.startTime}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    required={true}
-                  />
-                </div>
-                <div>
-                  <InputField
-                    label="End Date & Time"
-                    name="endTime"
-                    type="datetime-local"
-                    value={formData.endTime}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    required={true}
-                  />
-                </div>
->>>>>>> d42e8c05e5bcc667f7779b1012367fffc6d7a6c2
+                <InputField 
+                  label="Start Date & Time" 
+                  name="startTime" 
+                  type="datetime-local" 
+                  value={formData.startTime} 
+                  onChange={handleChange} 
+                  disabled={isSubmitting} 
+                  required={true} 
+                  min={getMinDateTimeLocal()} 
+                />
+                <InputField 
+                  label="End Date & Time" 
+                  name="endTime" 
+                  type="datetime-local" 
+                  value={formData.endTime} 
+                  onChange={handleChange} 
+                  disabled={isSubmitting} 
+                  required={true} 
+                  min={formData.startTime || getMinDateTimeLocal()} 
+                />
               </div>
 
               {/* Booking Conflicts Warning */}
