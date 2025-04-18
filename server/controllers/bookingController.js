@@ -15,6 +15,8 @@ const {
     sendBookingRejectionEmail,
     sendBookingRequestNotificationToAdmin,
     sendBookingWithdrawalConfirmationEmail, // Add this line
+    sendRescheduleRequestEmail,
+    sendRescheduleRequestNotificationToAdmin,
     formatDateTimeIST
 } = require('../utils/emailService'); // Assuming this path is correct
 
@@ -740,8 +742,9 @@ exports.requestReschedule = async (req, res, next) => {
     try {
         // Find the booking, ensuring it belongs to the user, and populate necessary details
         const booking = await Booking.findOne({ _id: bookingId, user: userId })
-            .populate('auditorium')            // Need auditorium for conflict check
-            .populate('department', 'name');    // For email/response
+            .populate('user', 'email username')  // Add email and username for user notification
+            .populate('auditorium')             // Need auditorium for conflict check
+            .populate('department', 'name');     // For email/response
 
         if (!booking) {
             return res.status(404).json({ success: false, message: 'Booking not found or you do not have permission to modify it.' });
@@ -787,32 +790,55 @@ exports.requestReschedule = async (req, res, next) => {
              });
          }
 
-        // Update the booking document: set new times, revert status to pending, clear rejection reason
-        booking.startTime = validatedStartTime; // Save validated UTC date
-        booking.endTime = validatedEndTime;     // Save validated UTC date
-        booking.status = 'pending'; // Must be re-approved by admin
-        booking.rejectionReason = undefined; // Clear any previous reason
+        // Store old times before updating
+        const oldTimes = {
+            startTime: booking.startTime,
+            endTime: booking.endTime
+        };
+
+        // Update the booking document
+        booking.startTime = validatedStartTime;
+        booking.endTime = validatedEndTime;
+        booking.status = 'pending';
+        booking.rejectionReason = undefined;
 
         const savedBooking = await booking.save();
-        console.log(`Reschedule requested for booking ${bookingId} by user ${userId}. New times (UTC): ${savedBooking.startTime.toISOString()} - ${savedBooking.endTime.toISOString()}. Status set to 'pending' for re-approval.`);
 
-        // Optionally, send notification to admin about the reschedule request?
-        // This would involve creating a new email type and calling it here.
-        // If ADMIN_EMAIL is set, you could consider adding:
-        // try { await sendRescheduleRequestNotificationToAdmin(...) } catch (e) { console.error(...) }
+        // Send notifications
+        try {
+            // Send email to user
+            if (booking.user?.email) {
+                await sendRescheduleRequestEmail(
+                    booking.user.email,
+                    savedBooking,
+                    booking.auditorium,
+                    booking.department,
+                    oldTimes
+                );
+                console.log(`[Email Sent] Reschedule confirmation to user ${booking.user.email}`);
+            }
 
+            // Send email to admin
+            if (process.env.ADMIN_EMAIL) {
+                await sendRescheduleRequestNotificationToAdmin(
+                    process.env.ADMIN_EMAIL,
+                    savedBooking,
+                    booking.auditorium,
+                    booking.department,
+                    oldTimes
+                );
+                console.log(`[Email Sent] Reschedule notification to admin ${process.env.ADMIN_EMAIL}`);
+            }
+        } catch (emailError) {
+            console.error(`[Non-critical Error] Sending reschedule notifications failed:`, emailError);
+            // Continue despite email failure
+        }
 
-        // Repopulate user, auditorium, and department for the response if save() didn't return populated doc.
-        // Since we initially populated and saved the populated doc, this might be redundant but safe.
-         const populatedReschedule = await Booking.findById(savedBooking._id)
-             .populate('user', 'email username')
-             .populate('auditorium', 'name location')
-             .populate('department', 'name');
-
+        // Return success response
         res.status(200).json({
             success: true,
             message: 'Reschedule request submitted. Your booking status is now pending re-approval.',
-            data: populatedReschedule // Send back the updated booking
+            data: savedBooking
         });
 
     } catch (error) {

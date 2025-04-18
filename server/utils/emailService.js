@@ -604,3 +604,117 @@ exports.sendBookingWithdrawalConfirmationEmail = async (userEmail, bookingDetail
         return;
     }
 };
+
+// --- Send Reschedule Request Email ---
+/**
+ * Sends an email notifying the user about their reschedule request.
+ * @param {string} userEmail - The recipient's email address.
+ * @param {object} bookingDetails - The populated Booking document.
+ * @param {object} auditoriumDetails - The populated Auditorium document.
+ * @param {object} departmentDetails - The populated Department document.
+ * @param {object} oldTimes - The previous schedule times.
+ * @returns {Promise<object | void>} Resolves with Nodemailer info object on success, or void on failure.
+ */
+exports.sendRescheduleRequestEmail = async (userEmail, bookingDetails, auditoriumDetails, departmentDetails, oldTimes) => {
+    try {
+        const partialBookingId = bookingDetails._id.toString().slice(-6);
+        const oldStartTimeIST = formatDateTimeIST(oldTimes.startTime);
+        const oldEndTimeIST = formatDateTimeIST(oldTimes.endTime);
+        const newStartTimeIST = formatDateTimeIST(bookingDetails.startTime);
+        const newEndTimeIST = formatDateTimeIST(bookingDetails.endTime);
+        const userName = bookingDetails.user?.username || 'User';
+
+        const emailSubject = `Booking Reschedule Request: ${bookingDetails.eventName}`;
+        
+        const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <h2 style="color: #f59e0b; text-align: center; margin-bottom: 20px;">Booking Reschedule Request</h2>
+            
+            <p>Dear ${userName},</p>
+            
+            <p>Your request to reschedule your booking has been submitted and is pending approval.</p>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 20px 0;">
+                <h3 style="color: #f59e0b; margin-top: 0; margin-bottom: 10px;">Event Details</h3>
+                <p><strong>Event:</strong> ${bookingDetails.eventName}</p>
+                <p><strong>Venue:</strong> ${auditoriumDetails?.name || 'N/A'}</p>
+                <p><strong>Department:</strong> ${departmentDetails?.name || 'N/A'}</p>
+                <p><strong>Booking ID:</strong> ${partialBookingId}</p>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <h3 style="color: #856404; margin-top: 0; margin-bottom: 10px;">Schedule Change</h3>
+                <p><strong>Previous Schedule:</strong><br>${oldStartTimeIST} - ${oldEndTimeIST}</p>
+                <p style="margin-top: 10px;"><strong>Requested New Schedule:</strong><br>${newStartTimeIST} - ${newEndTimeIST}</p>
+            </div>
+            
+            <p>Your booking status has been set to "pending" while we review this change. You will receive another email once the reschedule request is approved or rejected.</p>
+            
+            <p style="margin-top: 25px; color: #666;">If you have any questions, please contact the administration office.</p>
+        </div>
+        <div style="text-align: center; margin-top: 20px; font-size: 0.8em; color: #aaa;">
+            This is an automated message, please do not reply.
+        </div>`;
+
+        const info = await sendEmail(userEmail, emailSubject, htmlContent);
+        return info;
+    } catch (error) {
+        console.error(`[Email Service Error] Failed sending reschedule email:`, error);
+        return;
+    }
+};
+
+// --- Send Reschedule Request Notification to Admin ---
+/**
+ * Sends an email notifying the admin about a new reschedule request.
+ * @param {string} adminEmail - The admin's email address.
+ * @param {object} bookingDetails - The populated Booking document.
+ * @param {object} auditoriumDetails - The populated Auditorium document.
+ * @param {object} departmentDetails - The populated Department document.
+ * @param {object} oldTimes - The previous schedule times.
+ * @returns {Promise<object | void>} Resolves with Nodemailer info object on success, or void on failure.
+ */
+exports.sendRescheduleRequestNotificationToAdmin = async (adminEmail, bookingDetails, auditoriumDetails, departmentDetails, oldTimes) => {
+    try {
+        // Input validation
+        if (!adminEmail) throw new Error('Admin email missing for reschedule notification');
+        
+        // Prepare email content
+        const partialBookingId = bookingDetails._id.toString().slice(-6);
+        const oldStartTimeIST = formatDateTimeIST(oldTimes.startTime);
+        const oldEndTimeIST = formatDateTimeIST(oldTimes.endTime);
+        const newStartTimeIST = formatDateTimeIST(bookingDetails.startTime);
+        const newEndTimeIST = formatDateTimeIST(bookingDetails.endTime);
+        const userName = bookingDetails.user?.username || 'N/A';
+        const userEmail = bookingDetails.user?.email || 'N/A';
+
+        const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <h2 style="color: #f59e0b; text-align: center; margin-bottom: 20px;">New Reschedule Request</h2>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 20px 0;">
+                <h3 style="color: #f59e0b; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Event Details</h3>
+                <p><strong>Event:</strong> ${bookingDetails.eventName}</p>
+                <p><strong>Venue:</strong> ${auditoriumDetails?.name}</p>
+                <p><strong>Department:</strong> ${departmentDetails?.name}</p>
+                <p><strong>Requester:</strong> ${userName} (${userEmail})</p>
+                <p><strong>Booking ID:</strong> ${partialBookingId}</p>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <h3 style="color: #856404; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Schedule Change</h3>
+                <p><strong>Current Schedule:</strong><br/>${oldStartTimeIST} - ${oldEndTimeIST}</p>
+                <p style="margin-top: 10px;"><strong>Requested New Schedule:</strong><br/>${newStartTimeIST} - ${newEndTimeIST}</p>
+            </div>
+
+            <p style="text-align: center; color: #666;">Please review this request in the admin dashboard.</p>
+        </div>`;
+
+        const emailSubject = `🔄 Reschedule Request: ${bookingDetails.eventName}`;
+        const info = await sendEmail(adminEmail, emailSubject, htmlContent);
+        return info;
+    } catch (error) {
+        console.error(`[Email Service Error] Failed sending admin reschedule notification:`, error);
+        return;
+    }
+};
