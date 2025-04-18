@@ -1,26 +1,29 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const AdminNavbar = () => {
   return (
-    <nav className="bg-red-900 text-white p-4">
-      <div className="container mx-auto flex justify-between items-center">
-        <h1 className="text-xl font-bold">Admin Panel</h1>
-        <ul className="flex space-x-4">
+    <nav className="bg-red-900 text-white p-4 shadow-md">
+      <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center">
+        <h1 className="text-lg font-bold">Admin Panel</h1>
+        <ul className="flex flex-wrap gap-4 mt-2 sm:mt-0">
           <li>
-            <Link to="/admin-dashboard" className="hover:underline">
+            <NavLink to="/admin-dashboard" className={({isActive}) => 
+              `hover:underline ${isActive ? 'font-bold' : ''}`}>
               Dashboard
-            </Link>
+            </NavLink>
           </li>
           <li>
-            <Link to="/manage-bookings" className="hover:underline">
+            <NavLink to="/manage-bookings" className={({isActive}) => 
+              `hover:underline ${isActive ? 'font-bold' : ''}`}>
               Manage Bookings
-            </Link>
+            </NavLink>
           </li>
           <li>
-            <Link to="/" className="hover:underline">
+            <NavLink to="/" className={({isActive}) => 
+              `hover:underline ${isActive ? 'font-bold' : ''}`}>
               Logout
-            </Link>
+            </NavLink>
           </li>
         </ul>
       </div>

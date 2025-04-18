@@ -168,8 +168,8 @@ const HomePage = () => {
                   transition={{ type: "spring", stiffness: 300 }}
                 >
                   <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">1</div>
-                  <h3 className="text-xl font-semibold mb-3">Create Account</h3>
-                  <p className="text-gray-500">Sign up with your institutional email for access to our booking platform</p>
+                  <h3 className="text-xl font-semibold mb-3">Sign In</h3>
+                  <p className="text-gray-500">Use your institutional credentials to access our booking platform</p>
                 </motion.div>
                 
                 {/* Step 2 */}

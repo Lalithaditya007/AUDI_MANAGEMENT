@@ -1,62 +1,100 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaTwitter,
+  FaLinkedinIn,
+  FaYoutube
+} from 'react-icons/fa';
+import logo from '../assets/logo.png';
 
 const Footer = () => {
   return (
-    <footer className="bg-red-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Contact Information */}
+    <footer className="bg-[#1a1a1a] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* College Info */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Contact Us</h3>
-            <div className="space-y-2">
-              <p className="flex items-center">
-                <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                <span>+91 40 2304 2758</span>
-              </p>
-              <p className="flex items-center">
-                <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span>info@vnrvjiet.ac.in</span>
-              </p>
+            <img
+              src={logo}
+              alt="VNRVJIET Logo"
+              className="h-16 mb-4"
+            />
+            <h3 className="text-lg font-bold text-red-500">Contact Us</h3>
+            <p className="text-sm leading-relaxed mt-2">
+              VNR Vignana Jyothi Institute of Engineering & Technology<br />
+              Bachupally, Hyderabad, Telangana - 500090
+            </p>
+            <p className="mt-4 text-sm">Phone: +91-040-23042758/59/60</p>
+            <p className="text-sm">Email: info@vnrvjiet.ac.in</p>
+            <div className="flex gap-4 mt-4 text-xl">
+              <a href="https://facebook.com/vnrvjiet" target="_blank" rel="noopener noreferrer" className="hover:text-red-500"><FaFacebookF /></a>
+              <a href="https://instagram.com/vnrvjiet" target="_blank" rel="noopener noreferrer" className="hover:text-red-500"><FaInstagram /></a>
+              <a href="https://twitter.com/vnrvjiet" target="_blank" rel="noopener noreferrer" className="hover:text-red-500"><FaTwitter /></a>
+              <a href="https://linkedin.com/school/vnrvjiet" target="_blank" rel="noopener noreferrer" className="hover:text-red-500"><FaLinkedinIn /></a>
+              <a href="https://youtube.com/vnrvjiet" target="_blank" rel="noopener noreferrer" className="hover:text-red-500"><FaYoutube /></a>
             </div>
           </div>
 
-          {/* Quick Links */}
+          {/* Our Venues */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2">
+            <h3 className="text-lg font-bold mb-4 text-red-500">Our Venues</h3>
+            <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/auditoriums" className="hover:text-red-200 transition">
-                  Our Auditoriums
-                </Link>
+                <Link to="/ks-auditorium" className="hover:text-red-300">KS Auditorium</Link>
               </li>
               <li>
-                <Link to="/login" className="hover:text-red-200 transition">
-                  Book Now
-                </Link>
+                <Link to="/b-block-seminar-hall" className="hover:text-red-300">B Block Seminar Hall</Link>
+              </li>
+              <li>
+                <Link to="/apj-auditorium" className="hover:text-red-300">APJ Abdul Kalam Auditorium</Link>
+              </li>
+              <li>
+                <Link to="/peb-hall" className="hover:text-red-300">PEB Training Hall</Link>
               </li>
             </ul>
           </div>
 
-          {/* Address */}
+          {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Location</h3>
-            <p className="text-sm leading-relaxed">
-              VNR Vignana Jyothi Institute of Engineering & Technology,<br />
-              Vignana Jyothi Nagar, Pragathi Nagar,<br />
-              Nizampet (S.O), Hyderabad - 500 090,<br />
-              Telangana, India
-            </p>
+            <h3 className="text-lg font-bold mb-4 text-red-500">Quick Links</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link to="/book-auditorium" className="hover:text-red-300">Book Auditorium</Link>
+              </li>
+              <li>
+                <Link to="/booking-history" className="hover:text-red-300">Booking History</Link>
+              </li>
+              <li>
+                <Link to="/login" className="hover:text-red-300">Login</Link>
+              </li>
+              <li>
+                <Link to="/admin-dashboard" className="hover:text-red-300">Admin Dashboard</Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Help & Support */}
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-red-500">Help & Support</h3>
+            <ul className="space-y-2 text-sm">
+              <li>Booking Guidelines</li>
+              <li>Terms & Conditions</li>
+              <li>Privacy Policy</li>
+              <li>Contact Support</li>
+            </ul>
+            <div className="mt-6">
+              <h4 className="font-semibold mb-2">Need Help?</h4>
+              <p className="text-sm">For booking assistance:</p>
+              <p className="text-sm text-red-400">support@vnrvjiet.ac.in</p>
+            </div>
           </div>
         </div>
 
         {/* Copyright */}
-        <div className="mt-8 pt-4 border-t border-red-800 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} VNR VJIET. All rights reserved.</p>
+        <div className="mt-10 pt-4 border-t border-gray-700 text-center text-sm">
+          <p>&copy; {new Date().getFullYear()} VNR VJIET - Auditorium Management System. All rights reserved.</p>
         </div>
       </div>
     </footer>
