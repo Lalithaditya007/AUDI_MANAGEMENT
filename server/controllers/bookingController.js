@@ -13,7 +13,9 @@ const {
     sendBookingRequestEmail,
     sendBookingApprovalEmail,
     sendBookingRejectionEmail,
-    sendBookingRequestNotificationToAdmin
+    sendBookingRequestNotificationToAdmin,
+    sendBookingWithdrawalConfirmationEmail, // Add this line
+    formatDateTimeIST
 } = require('../utils/emailService'); // Assuming this path is correct
 
 // --- Constants ---
@@ -45,28 +47,38 @@ const cleanupUploadedFileOnError = (file) => {
 
 // --- Helper: Booking Time Validation ---
 const validateBookingTime = (startTimeISO, endTimeISO, leadTimeHrs = bookingLeadTimeHours, openHour = openingHourIST) => {
-    const start = DateTime.fromISO(startTimeISO);
-    const end = DateTime.fromISO(endTimeISO);
+    const start = DateTime.fromISO(startTimeISO, { zone: istTimezone }); // Assume input is IST local time
+    const end = DateTime.fromISO(endTimeISO, { zone: istTimezone });   // Assume input is IST local time
+
 
     if (!start.isValid || !end.isValid) {
-        return { valid: false, message: 'Invalid start or end time format. Please use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ).' };
+         // Provide specific format help, e.g., "2023-10-27T10:00:00"
+        return { valid: false, message: 'Invalid start or end time format. Please use a valid date/time string (e.g., YYYY-MM-DDTHH:mm:ss).' };
     }
+     // Validate start/end relationship AFTER parsing
     if (start >= end) {
         return { valid: false, message: 'End time must be strictly after start time.' };
     }
 
-    const startIST = start.setZone(istTimezone);
-    if (startIST.hour < openHour) {
+
+     // Check start time against opening hour in IST
+    if (start.hour < openHour) {
         return { valid: false, message: `Booking cannot start before ${openHour}:00 AM ${istTimezone}.` };
     }
 
-    const now = DateTime.now();
-    if (start < now.plus({ hours: leadTimeHrs })) {
-        return { valid: false, message: `Booking must be made at least ${leadTimeHrs} hours in advance.` };
+    // Check lead time requirement in IST
+    const nowIST = DateTime.now().setZone(istTimezone);
+    if (start < nowIST.plus({ hours: leadTimeHrs })) {
+        return { valid: false, message: `Booking must be made at least ${leadTimeHrs} hours in advance of the start time in ${istTimezone}.` };
     }
 
-    // Return JS Date objects (in UTC) for Mongoose
-    return { valid: true, message: 'Time validation passed.', start: start.toJSDate(), end: end.toJSDate() };
+    // Return JS Date objects (converted to UTC for database storage)
+    return {
+        valid: true,
+        message: 'Time validation passed.',
+        start: start.toUTC().toJSDate(), // Convert to UTC for Mongoose
+        end: end.toUTC().toJSDate()     // Convert to UTC for Mongoose
+    };
 };
 
 
@@ -83,49 +95,58 @@ exports.createBooking = async (req, res) => {
 
         // --- 1. Basic Input Validation ---
         if (!eventName || !description || !startTime || !endTime || !auditorium || !department) {
+            // Clean up file if it was uploaded before basic validation failed
+            if (req.file) cleanupUploadedFileOnError(req.file);
             return res.status(400).json({ success: false, message: 'Missing required booking fields.' });
         }
         if (!mongoose.Types.ObjectId.isValid(auditorium) || !mongoose.Types.ObjectId.isValid(department)) {
+             // Clean up file if it was uploaded before ID validation failed
+            if (req.file) cleanupUploadedFileOnError(req.file);
             return res.status(400).json({ success: false, message: 'Invalid Auditorium or Department ID format.' });
         }
 
         // --- 2. Time Validation ---
         const timeValidation = validateBookingTime(startTime, endTime);
         if (!timeValidation.valid) {
+             // Clean up file if it was uploaded before time validation failed
+             if (req.file) cleanupUploadedFileOnError(req.file);
             return res.status(400).json({ success: false, message: timeValidation.message });
         }
-        const validatedStartTime = timeValidation.start; // Use JS Date from validation
-        const validatedEndTime = timeValidation.end;     // Use JS Date from validation
+        const validatedStartTime = timeValidation.start; // Use JS Date from validation (UTC)
+        const validatedEndTime = timeValidation.end;     // Use JS Date from validation (UTC)
 
-        // --- 3. Check for Immediate Conflicts ---
+        // --- 3. Check for Immediate Conflicts with *APPROVED* bookings ---
+         // Use the UTC dates from validation for the database query
         const immediateConflict = await Booking.findOne({
             auditorium: auditorium,
             status: 'approved',
-            startTime: { $lt: validatedEndTime }, // Starts before the new end time
-            endTime: { $gt: validatedStartTime }  // Ends after the new start time
+            startTime: { $lt: validatedEndTime }, // Starts before the new end time (in UTC)
+            endTime: { $gt: validatedStartTime }  // Ends after the new start time (in UTC)
         });
 
         if (immediateConflict) {
-            console.warn(`[Create Booking] Immediate conflict detected for user ${userId} trying to book auditorium ${auditorium} for ${startTime}-${endTime}. Conflict with booking ${immediateConflict._id} (${immediateConflict.eventName}).`);
-            return res.status(409).json({
+            console.warn(`[Create Booking] Immediate conflict detected for user ${userId} trying to book auditorium ${auditorium} for ${startTime}-${endTime} (IST). Conflict with booking ${immediateConflict._id} (${immediateConflict.eventName}).`);
+             // Clean up file if it was uploaded before conflict validation failed
+            if (req.file) cleanupUploadedFileOnError(req.file);
+            return res.status(409).json({ // Use 409 Conflict status
                 success: false,
                 message: `The requested time slot conflicts with an existing approved booking (${immediateConflict.eventName}). Please choose a different time.`
             });
         }
 
-        // --- 4. Handle File Upload --- (Place after validation)
+        // --- 4. Handle File Upload --- (Place after all synchronous validation)
+        // Multer handles the upload and saves req.file
         const eventImage = req.file ? `/uploads/${req.file.filename}` : null;
         if(req.file) {
-           uploadedFilePath = req.file.path; // Save for cleanup if needed
+           uploadedFilePath = req.file.path; // Save actual file path for cleanup
         }
 
-
         // --- 5. Create Booking Document ---
-        const booking = await Booking.create({
+        const booking = new Booking({ // Use `new` and `save` for better control
             eventName: eventName.trim(),
             description: description.trim(),
-            startTime: validatedStartTime, // Use validated date
-            endTime: validatedEndTime,     // Use validated date
+            startTime: validatedStartTime, // Use validated UTC date
+            endTime: validatedEndTime,     // Use validated UTC date
             auditorium: auditorium,
             department: department,
             user: userId,
@@ -133,44 +154,54 @@ exports.createBooking = async (req, res) => {
             status: 'pending' // Default status
         });
 
-        // --- 6. Populate for Emails ---
+        await booking.save(); // Save the booking
+
+        // --- 6. Populate for Emails/Response ---
         const populatedBooking = await Booking.findById(booking._id)
             .populate('user', 'email username')
             .populate('auditorium', 'name location')
             .populate('department', 'name');
 
         if (!populatedBooking) {
-            // Should not happen if create succeeded, but good practice
-             console.error(`[Critical Error] Failed to populate newly created booking ${booking._id}`);
-             // Clean up potentially created booking document? Less critical than the file usually.
-             throw new Error("Failed to retrieve details of the created booking.");
+             // This is a critical error - booking saved but couldn't be found/populated
+             console.error(`[Critical Error] Failed to populate newly created booking ${booking._id} after save.`);
+             // Attempt cleanup if file was uploaded
+             if (req.file && uploadedFilePath) cleanupUploadedFileOnError({ path: uploadedFilePath });
+             // Deciding whether to delete the booking here is complex; usually, manual cleanup is needed if this rare case occurs.
+             throw new Error("Booking created but failed to retrieve details."); // Propagate error
         }
 
         // --- 7. Send Emails (User Confirmation + Admin Notification) ---
+        // These are non-critical, so we log errors but don't block the response
         try {
+            // Ensure user email exists before attempting to send
             if (populatedBooking.user?.email) {
-                 await sendBookingRequestEmail(populatedBooking.user.email, populatedBooking, populatedBooking.auditorium, populatedBooking.department);
-                 console.log(`[Email Sent] Booking request confirmation sent for ${booking._id} to ${populatedBooking.user.email}`);
+                 await sendBookingRequestEmail(
+                    populatedBooking.user.email, // Pass user email explicitly
+                    populatedBooking,            // Pass populated booking object
+                    populatedBooking.auditorium, // Pass populated auditorium object
+                    populatedBooking.department  // Pass populated department object
+                 );
+                 console.log(`[Email Sent] Booking request confirmation attempt to ${populatedBooking.user.email} for booking ${booking._id}`);
             } else {
                  console.warn(`[Email Skipped] User email missing for booking ${booking._id}. Cannot send confirmation.`);
             }
         } catch (emailError) {
             console.error(`[Non-critical Error] Sending user confirmation email failed for booking ${booking._id}:`, emailError.message || emailError);
-            // Do not fail the request, just log the error
         }
 
+        // Ensure ADMIN_EMAIL is configured
         if (ADMIN_EMAIL) {
             try {
                 await sendBookingRequestNotificationToAdmin(
-                    ADMIN_EMAIL,
-                    populatedBooking,
-                    populatedBooking.auditorium,
-                    populatedBooking.department
+                    ADMIN_EMAIL,                 // Pass admin email
+                    populatedBooking,            // Pass populated booking object
+                    populatedBooking.auditorium, // Pass populated auditorium object
+                    populatedBooking.department  // Pass populated department object
                 );
-                console.log(`[Email Sent] Admin notification sent for booking ${booking._id} to ${ADMIN_EMAIL}`);
+                console.log(`[Email Sent] Admin notification attempt to ${ADMIN_EMAIL} for booking ${booking._id}`);
             } catch (emailError) {
                 console.error('[Non-critical Error] Sending admin notification email failed:', emailError.message || emailError);
-                // Do not fail the request, just log the error
             }
         } else {
             console.warn('[Warning] ADMIN_EMAIL not configured in environment variables. Skipping admin notification.');
@@ -181,27 +212,25 @@ exports.createBooking = async (req, res) => {
 
     } catch (error) {
         // --- Error Handling & Cleanup ---
-        if (req.file && uploadedFilePath) {
-            // Use the stored path from the successful upload attempt
-             cleanupUploadedFileOnError({ path: uploadedFilePath }); // Pass as object to match helper structure
-        } else if (req.file) {
-             // Fallback if path wasn't stored (shouldn't happen ideally)
-             cleanupUploadedFileOnError(req.file);
+        // Ensure file cleanup happens if req.file exists and an error occurred
+        if (req.file) {
+             // Use req.file.path which is the path where multer saved the file
+             cleanupUploadedFileOnError({ path: req.file.path });
         }
         console.error("[Error] Create Booking Failed:", error);
 
-        // Handle potential Mongoose validation errors specifically
+        // Handle specific Mongoose errors or others
         if (error.name === 'ValidationError') {
             return res.status(400).json({ success: false, message: error.message });
         }
-         // Handle CastError for invalid ObjectIds if not caught earlier
          if (error.name === 'CastError') {
             return res.status(400).json({ success: false, message: `Invalid ID format provided: ${error.value}` });
         }
 
-
-        // Generic server error
-        res.status(500).json({ success: false, message: error.message || 'Server error creating booking request.' });
+        // Generic server error - avoid sending headers multiple times
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: error.message || 'Server error creating booking request.' });
+        }
     }
 };
 
@@ -276,18 +305,21 @@ exports.getAllBookings = async (req, res, next) => {
 
         // Date Filter (Based on IST Day Overlap)
         if (req.query.date) {
-            const targetDate = DateTime.fromISO(req.query.date, { zone: istTimezone });
-            if (!targetDate.isValid) {
+             const targetDateIST = DateTime.fromISO(req.query.date, { zone: istTimezone });
+            if (!targetDateIST.isValid) {
                 return res.status(400).json({ success: false, message: `Invalid date filter format: ${req.query.date}. Use YYYY-MM-DD.` });
             }
-            // Find bookings that overlap with the target day in IST
-            const startOfDayUTC = targetDate.startOf('day').toUTC().toJSDate();
-            const endOfDayUTC = targetDate.endOf('day').toUTC().toJSDate();
-            // A booking overlaps if it starts before the end of the day AND ends after the start of the day
+            // Find bookings that overlap with the target day in IST.
+            // Convert start and end of the IST day to UTC for MongoDB query.
+            const startOfDayUTC = targetDateIST.startOf('day').toUTC().toJSDate();
+            const endOfDayUTC = targetDateIST.endOf('day').toUTC().toJSDate();
+
+            // A booking overlaps if its UTC startTime is before the end of the target UTC day
+            // AND its UTC endTime is after the start of the target UTC day.
             query.startTime = { $lt: endOfDayUTC };
             query.endTime = { $gt: startOfDayUTC };
             filtersApplied.date = req.query.date;
-            console.log(`[Admin All Bookings] Date filter active: ${startOfDayUTC.toISOString()} - ${endOfDayUTC.toISOString()} (UTC)`);
+             console.log(`[Admin All Bookings] Date filter active: ${startOfDayUTC.toISOString()} - ${endOfDayUTC.toISOString()} (UTC)`);
         }
 
         const bookings = await Booking.find(query)
@@ -319,6 +351,7 @@ exports.approveBooking = async (req, res, next) => {
     }
 
     try {
+        // Find the booking and populate necessary fields *before* updating
         const booking = await Booking.findById(bookingId)
             .populate('user', 'email username') // Needed for email
             .populate('auditorium')            // Needed for conflict check & email
@@ -333,12 +366,13 @@ exports.approveBooking = async (req, res, next) => {
         }
 
         // Check for conflicts with OTHER 'approved' bookings for the SAME auditorium
+         // Use the booking's stored UTC times for the conflict check
         const conflict = await Booking.findOne({
             _id: { $ne: booking._id }, // Exclude the booking itself
             auditorium: booking.auditorium._id,
             status: 'approved',
-            startTime: { $lt: booking.endTime }, // Starts before this one ends
-            endTime: { $gt: booking.startTime }   // Ends after this one starts
+            startTime: { $lt: booking.endTime }, // Check against UTC times
+            endTime: { $gt: booking.startTime }   // Check against UTC times
         });
 
         if (conflict) {
@@ -353,20 +387,33 @@ exports.approveBooking = async (req, res, next) => {
         booking.status = 'approved';
         booking.rejectionReason = undefined; // Ensure reason is cleared on approval
 
+        // Use findByIdAndUpdate with $set for atomicity if possible,
+        // but saving the populated document after modification is also fine
         const updatedBooking = await booking.save();
         console.log(`Booking ${updatedBooking._id} (${updatedBooking.eventName}) approved by admin.`);
 
-        // Send approval email (Non-critical failure)
+        // Send approval email (Non-critical failure - log and continue)
         try {
-             if (booking.user?.email && booking.auditorium && booking.department) {
-                await sendBookingApprovalEmail(booking.user.email, updatedBooking, booking.auditorium, booking.department);
-                console.log(`[Email Sent] Approval notification sent for booking ${updatedBooking._id} to ${booking.user.email}`);
+             // Ensure user email, auditorium, and department are populated
+             if (updatedBooking.user?.email && updatedBooking.auditorium && updatedBooking.department) {
+                await sendBookingApprovalEmail(
+                    updatedBooking.user.email, // Pass user email
+                    updatedBooking,            // Pass the updated booking object
+                    updatedBooking.auditorium, // Pass populated auditorium
+                    updatedBooking.department  // Pass populated department
+                 );
+                console.log(`[Email Sent] Approval notification attempt to ${updatedBooking.user.email} for booking ${updatedBooking._id}`);
             } else {
                  console.warn(`[Email Skipped] Approval email skipped for ${updatedBooking._id}. Missing user email, auditorium, or department details.`);
             }
         } catch (e) {
             console.error(`[Non-critical Error] Sending approval email for booking ${updatedBooking._id} failed:`, e.message || e);
         }
+
+        // Re-populate if save didn't return fully populated doc (depends on Mongoose settings)
+        // Or ensure the initial populate included all needed fields as done above.
+         // Since the initial `booking` variable was populated, and `save()` on it
+         // usually returns the full document, `updatedBooking` should be populated.
 
         res.status(200).json({ success: true, message: 'Booking approved successfully.', data: updatedBooking });
 
@@ -393,10 +440,11 @@ exports.rejectBooking = async (req, res, next) => {
     }
 
     try {
+        // Find the booking and populate necessary fields *before* updating
         const booking = await Booking.findById(bookingId)
-            .populate('user', 'email username') // Needed for email
-            .populate('auditorium')            // Needed for email
-            .populate('department', 'name');    // Needed for email
+            .populate('user', 'email username')
+            .populate('auditorium')
+            .populate('department', 'name');
 
         if (!booking) {
             return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
@@ -406,38 +454,62 @@ exports.rejectBooking = async (req, res, next) => {
             return res.status(400).json({ success: false, message: `Booking status is already '${booking.status}'. Only pending bookings can be rejected.` });
         }
 
-        // Update status and set rejection reason
-        booking.status = 'rejected';
-        booking.rejectionReason = rejectionReason.trim();
+        // Update the booking document directly
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            bookingId,
+            {
+                $set: {
+                    status: 'rejected',
+                    rejectionReason: rejectionReason.trim()
+                }
+            },
+            { new: true, runValidators: false } // Return updated document
+        ).populate('user', 'email username') // Repopulate for email/response
+         .populate('auditorium')
+         .populate('department', 'name');
 
-        const updatedBooking = await booking.save();
-        console.log(`Booking ${updatedBooking._id} (${updatedBooking.eventName}) rejected by admin. Reason: ${updatedBooking.rejectionReason}`);
+        console.log(`Booking ${updatedBooking._id} rejected by admin. Reason: ${updatedBooking.rejectionReason}`);
 
-        // Send rejection email (Non-critical failure)
+        // Send rejection email (Non-critical failure - log and continue)
         try {
-            if (booking.user?.email && booking.auditorium && booking.department) {
+            // Ensure user email, auditorium, and department are populated on the updatedBooking
+            if (updatedBooking.user?.email && updatedBooking.auditorium && updatedBooking.department) {
+                console.log(`Attempting to send rejection email to: ${updatedBooking.user.email}`);
+                console.log(`Booking details for email:`, {
+                  id: updatedBooking._id,
+                  eventName: updatedBooking.eventName,
+                  userEmail: updatedBooking.user.email,
+                  auditorium: updatedBooking.auditorium.name,
+                  department: updatedBooking.department.name
+                });
+
                 await sendBookingRejectionEmail(
-                    booking.user.email,
-                    updatedBooking,
-                    booking.auditorium,
-                    booking.department,
-                    updatedBooking.rejectionReason // Pass the reason to the email function
-                 );
-                console.log(`[Email Sent] Rejection notification sent for booking ${updatedBooking._id} to ${booking.user.email}`);
+                    updatedBooking.user.email, // Pass user email
+                    updatedBooking,            // Pass the updated booking object
+                    updatedBooking.auditorium, // Pass populated auditorium
+                    updatedBooking.department,  // Pass populated department
+                    updatedBooking.rejectionReason // Pass the reason
+                );
+                 console.log(`[Email Sent] Rejection notification attempt to ${updatedBooking.user.email} for booking ${updatedBooking._id}`);
             } else {
                  console.warn(`[Email Skipped] Rejection email skipped for ${updatedBooking._id}. Missing user email, auditorium, or department details.`);
             }
-        } catch (e) {
-            console.error(`[Non-critical Error] Sending rejection email for booking ${updatedBooking._id} failed:`, e.message || e);
+        } catch (emailError) {
+            console.error(`[Non-critical Error] Sending rejection email for booking ${updatedBooking._id} failed:`, emailError.message || emailError);
         }
 
-        res.status(200).json({ success: true, message: 'Booking rejected successfully.', data: updatedBooking });
+        res.status(200).json({
+            success: true,
+            message: 'Booking rejected successfully.',
+            data: updatedBooking
+        });
 
     } catch (error) {
         console.error(`[Error] Rejecting booking ${bookingId} failed:`, error);
-        if (!res.headersSent) {
-            res.status(500).json({ success: false, message: 'Server error during booking rejection.' });
-        }
+        res.status(500).json({
+            success: false,
+            message: 'Server error during booking rejection.'
+        });
     }
 };
 
@@ -481,18 +553,24 @@ exports.getBookingStats = async (req, res, next) => {
                 // Perform a lookup to get the name of the auditorium/department
                  {
                     $lookup: {
-                         from: groupByField === 'auditorium' ? 'auditoria' : 'departments', // Collection name
+                         from: groupByField === 'auditorium' ? 'auditoria' : 'departments', // Collection name (check your actual collection names)
                          localField: '_id',      // Booking's auditorium/department field (which is the _id from previous $group)
                          foreignField: '_id', // Auditorium/Department collection's _id field
                          as: 'groupInfo'
                      }
+                 },
+                 {
+                    $unwind: {
+                         path: '$groupInfo',
+                         preserveNullAndEmptyArrays: true // Keep groups even if lookup fails (e.g., deleted auditorium/department)
+                    }
                  },
                 // Reshape the document
                  {
                      $project: {
                          _id: 1, // Keep the auditorium/department ID
                          // Safely get the name, default to 'Unknown' if lookup fails or name missing
-                         name: { $ifNull: [{ $arrayElemAt: ['$groupInfo.name', 0] }, 'Unknown / Deleted'] },
+                         name: { $ifNull: ['$groupInfo.name', 'Unknown / Deleted'] },
                          total: 1,
                         // Explicitly project status counts, defaulting to 0
                         pending: { $ifNull: ['$statsAsObject.pending', 0] },
@@ -564,8 +642,11 @@ exports.withdrawBooking = async (req, res, next) => {
     }
 
     try {
-        // Find the booking, ensuring it belongs to the current user
-        const booking = await Booking.findOne({ _id: bookingId, user: userId });
+        // Find the booking, ensuring it belongs to the current user and populate needed fields
+        const booking = await Booking.findOne({ _id: bookingId, user: userId })
+            .populate('user', 'email username')
+            .populate('auditorium', 'name')
+            .populate('department', 'name');
 
         if (!booking) {
             return res.status(404).json({ success: false, message: 'Booking not found or you do not have permission to withdraw it.' });
@@ -578,33 +659,57 @@ exports.withdrawBooking = async (req, res, next) => {
 
         // Additional check for 'approved' bookings: Cannot withdraw too close to the start time
         if (booking.status === 'approved') {
-            const now = DateTime.now();
-            const startTime = DateTime.fromJSDate(booking.startTime, { zone: 'utc' }); // Ensure we work with UTC date from DB
+            const nowIST = DateTime.now().setZone(istTimezone); // Use IST for the check
+            const startTimeIST = DateTime.fromJSDate(booking.startTime).setZone(istTimezone); // Convert stored UTC time to IST
 
-            // Calculate the cutoff time (X hours before the start time)
-            const allowedWithdrawTime = startTime.minus({ hours: bookingLeadTimeHours }); // Default lead time constant
+            // Calculate the cutoff time (X hours before the start time) in IST
+            const allowedWithdrawTimeIST = startTimeIST.minus({ hours: bookingLeadTimeHours }); // Default lead time constant
 
-            if (now >= allowedWithdrawTime) { // If current time is at or after the cutoff time
-                console.warn(`[Withdraw Denied] User ${userId} attempted to withdraw approved booking ${bookingId} too late. Now: ${now.toISO()}, Cutoff: ${allowedWithdrawTime.toISO()}`);
+            if (nowIST >= allowedWithdrawTimeIST) { // If current time is at or after the cutoff time in IST
+                console.warn(`[Withdraw Denied] User ${userId} attempted to withdraw approved booking ${bookingId} too late. Now (IST): ${nowIST.toISO()}, Cutoff (IST): ${allowedWithdrawTimeIST.toISO()}`);
                 return res.status(400).json({
-                     success: false,
-                     message: `Approved bookings cannot be withdrawn less than ${bookingLeadTimeHours} hours before the scheduled start time.`
-                 });
+                    success: false,
+                    message: `Approved bookings cannot be withdrawn less than ${bookingLeadTimeHours} hours before the scheduled start time in ${istTimezone}.`
+                });
             }
+        }
+
+        // Send withdrawal confirmation email before proceeding with deletion
+        try {
+            if (booking.user?.email) {
+                await sendBookingWithdrawalConfirmationEmail(
+                    booking.user.email,
+                    booking,
+                    booking.auditorium,
+                    booking.department
+                );
+                console.log(`[Email Sent] Withdrawal confirmation sent to ${booking.user.email} for booking ${bookingId}`);
+            }
+        } catch (emailError) {
+            console.error(`[Non-critical Error] Sending withdrawal confirmation email failed:`, emailError);
+            // Continue with deletion even if email fails
         }
 
         // If the booking has images, attempt to delete them
         if (booking.eventImages && booking.eventImages.length > 0) {
-             console.log(`[Withdrawal Cleanup] Preparing to delete images for booking ${bookingId}`);
+            console.log(`[Withdrawal Cleanup] Preparing to delete images for booking ${bookingId}`);
             booking.eventImages.forEach(imagePath => {
                 if (imagePath) {
-                     cleanupUploadedFileOnError(imagePath); // Pass the path string
+                    cleanupUploadedFileOnError(imagePath); // Pass the path string (e.g., '/uploads/filename.jpg')
                 }
             });
         }
 
         // Delete the booking document
-        await Booking.deleteOne({ _id: bookingId });
+        const deleteResult = await Booking.deleteOne({ _id: bookingId, user: userId });
+
+        if (deleteResult.deletedCount === 0) {
+            // This case should theoretically be caught by the findOne above,
+            // but it's a good safety check if race conditions were possible.
+            console.warn(`[Withdrawal] deleteOne returned 0 count for booking ${bookingId} by user ${userId}. Booking might have been deleted already.`);
+            return res.status(404).json({ success: false, message: 'Booking not found or already withdrawn.' });
+        }
+
         console.log(`Booking ${bookingId} (${booking.eventName}) successfully withdrawn by user ${userId}.`);
 
         res.status(200).json({ success: true, message: 'Booking withdrawn successfully.' });
@@ -633,10 +738,10 @@ exports.requestReschedule = async (req, res, next) => {
     }
 
     try {
-        // Find the booking, ensuring it belongs to the user
+        // Find the booking, ensuring it belongs to the user, and populate necessary details
         const booking = await Booking.findOne({ _id: bookingId, user: userId })
             .populate('auditorium')            // Need auditorium for conflict check
-            .populate('department', 'name');    // For potential future use/logging
+            .populate('department', 'name');    // For email/response
 
         if (!booking) {
             return res.status(404).json({ success: false, message: 'Booking not found or you do not have permission to modify it.' });
@@ -647,31 +752,31 @@ exports.requestReschedule = async (req, res, next) => {
              return res.status(500).json({ success: false, message: 'Internal server error: Booking data is incomplete.' });
          }
 
-
         if (booking.status !== 'approved') {
             return res.status(400).json({ success: false, message: `Only approved bookings can be rescheduled. Current status is '${booking.status}'.` });
         }
 
-        // Validate the new times
-        const timeValidation = validateBookingTime(newStartTime, newEndTime); // Uses defaults for lead time, opening hour
+        // Validate the new times using the helper (which checks format, start<end, opening hours, and lead time in IST)
+        const timeValidation = validateBookingTime(newStartTime, newEndTime);
         if (!timeValidation.valid) {
             return res.status(400).json({ success: false, message: `Invalid new times: ${timeValidation.message}` });
         }
-        const validatedStartTime = timeValidation.start;
-        const validatedEndTime = timeValidation.end;
+        const validatedStartTime = timeValidation.start; // UTC Date
+        const validatedEndTime = timeValidation.end;     // UTC Date
 
-        // Check if times are actually different
+        // Check if times are actually different (comparing UTC Dates from validation)
         if (booking.startTime.getTime() === validatedStartTime.getTime() && booking.endTime.getTime() === validatedEndTime.getTime()) {
             return res.status(400).json({ success: false, message: `The requested new time slot is the same as the current schedule.` });
         }
 
         // Check for conflicts with OTHER approved bookings at the NEW time slot
+         // Use the new validated UTC times for the conflict check
         const conflictNew = await Booking.findOne({
-            _id: { $ne: booking._id }, // Exclude the current booking
+            _id: { $ne: booking._id }, // Exclude the current booking by its ID
             auditorium: booking.auditorium._id,
             status: 'approved',
-            startTime: { $lt: validatedEndTime },
-            endTime: { $gt: validatedStartTime }
+            startTime: { $lt: validatedEndTime }, // Check against the new UTC times
+            endTime: { $gt: validatedStartTime }  // Check against the new UTC times
         });
 
         if (conflictNew) {
@@ -682,19 +787,23 @@ exports.requestReschedule = async (req, res, next) => {
              });
          }
 
-        // Update the booking: set new times, revert status to pending, clear rejection reason
-        booking.startTime = validatedStartTime;
-        booking.endTime = validatedEndTime;
+        // Update the booking document: set new times, revert status to pending, clear rejection reason
+        booking.startTime = validatedStartTime; // Save validated UTC date
+        booking.endTime = validatedEndTime;     // Save validated UTC date
         booking.status = 'pending'; // Must be re-approved by admin
         booking.rejectionReason = undefined; // Clear any previous reason
 
         const savedBooking = await booking.save();
-        console.log(`Reschedule requested for booking ${bookingId} by user ${userId}. New times: ${savedBooking.startTime.toISOString()} - ${savedBooking.endTime.toISOString()}. Status set to 'pending' for re-approval.`);
+        console.log(`Reschedule requested for booking ${bookingId} by user ${userId}. New times (UTC): ${savedBooking.startTime.toISOString()} - ${savedBooking.endTime.toISOString()}. Status set to 'pending' for re-approval.`);
 
         // Optionally, send notification to admin about the reschedule request?
-        // if (ADMIN_EMAIL) { try { /* ... send email ... */ } catch(e){}}
+        // This would involve creating a new email type and calling it here.
+        // If ADMIN_EMAIL is set, you could consider adding:
+        // try { await sendRescheduleRequestNotificationToAdmin(...) } catch (e) { console.error(...) }
 
-        // Repopulate user for the response if needed (or select fields)
+
+        // Repopulate user, auditorium, and department for the response if save() didn't return populated doc.
+        // Since we initially populated and saved the populated doc, this might be redundant but safe.
          const populatedReschedule = await Booking.findById(savedBooking._id)
              .populate('user', 'email username')
              .populate('auditorium', 'name location')
@@ -743,12 +852,12 @@ exports.getAuditoriumSchedule = async (req, res, next) => {
 
         console.log(`[Schedule Query] Fetching approved bookings for ${auditoriumId} overlapping month ${year}-${month} (UTC range: ${startUTC.toISOString()} to ${endUTC.toISOString()})`);
 
-        // Find APPROVED bookings that OVERLAP with the requested month
+        // Find APPROVED bookings that OVERLAP with the requested month (using UTC dates)
         const schedule = await Booking.find({
             auditorium: auditoriumId,
             status: 'approved',
-            startTime: { $lt: endUTC }, // Starts before the month ends
-            endTime: { $gt: startUTC }   // Ends after the month starts
+            startTime: { $lt: endUTC }, // Starts before the month ends (UTC)
+            endTime: { $gt: startUTC }   // Ends after the month starts (UTC)
         })
         .populate('user', 'username email') // Include user details
         .select('eventName startTime endTime user description') // Select relevant fields
@@ -804,16 +913,21 @@ exports.getUpcomingBookings = async (req, res, next) => {
     console.log(`GET /api/bookings/upcoming requested | Days ahead: ${effectiveDays}`);
 
     try {
-        const now = DateTime.now().startOf('day').toJSDate(); // Start from beginning of today
-        const futureCutoff = DateTime.now().plus({ days: effectiveDays }).endOf('day').toJSDate(); // End of the target future day
+        // Use Luxon to calculate dates in IST, then convert to UTC for query
+        const nowIST = DateTime.now().setZone(istTimezone);
+        const startQueryUTC = nowIST.startOf('day').toUTC().toJSDate(); // Start of today in IST, converted to UTC
+        const futureCutoffIST = nowIST.plus({ days: effectiveDays }).endOf('day'); // End of the target future day in IST
+        const endQueryUTC = futureCutoffIST.toUTC().toJSDate(); // Converted to UTC
 
-        console.log(`[Upcoming Query] Fetching approved bookings from ${now.toISOString()} to ${futureCutoff.toISOString()}`);
+        console.log(`[Upcoming Query] Fetching approved bookings starting in IST between ${nowIST.startOf('day').toISO()} and ${futureCutoffIST.toISO()}`);
+        console.log(`[Upcoming Query] Corresponding UTC query range: ${startQueryUTC.toISOString()} to ${endQueryUTC.toISOString()}`);
+
 
         const upcoming = await Booking.find({
             status: 'approved',
             startTime: {
-                 $gte: now,         // Starts today or later
-                 $lt: futureCutoff  // Starts before the end of the target future day
+                 $gte: startQueryUTC,         // Starts today (IST) or later (using UTC equivalent)
+                 $lt: endQueryUTC  // Starts before the end of the target future day (IST) (using UTC equivalent)
             }
         })
         .sort({ startTime: 1 }) // Chronological order
@@ -840,38 +954,44 @@ exports.getBookingTrends = async (req, res, next) => {
     const auditoriumIdFilter = req.query.auditoriumId;
     const departmentIdFilter = req.query.departmentId;
     // Set default days and max cap
-    const effectiveDays = (!isNaN(daysParam) && daysParam > 0) ? Math.min(daysParam, 180) : 30;
+    const effectiveDays = (!isNaN(daysParam) && daysParam > 0) ? Math.min(daysParam, 365) : 30; // Increased max to 365
     console.log(`GET /api/bookings/trends requested | Days: ${effectiveDays}, Auditorium Filter: ${auditoriumIdFilter || 'None'}, Department Filter: ${departmentIdFilter || 'None'}`);
 
     try {
-        const endDate = DateTime.now().setZone(istTimezone).endOf('day'); // Today in IST
-        const startDate = endDate.minus({ days: effectiveDays - 1 }).startOf('day'); // Go back X days, start of that day
-        const startDateUTC = startDate.toUTC().toJSDate();
+        // Calculate the date range for 'createdAt' using IST, then convert to UTC for the query
+        const endDateIST = DateTime.now().setZone(istTimezone).endOf('day'); // End of today in IST
+        const startDateIST = endDateIST.minus({ days: effectiveDays - 1 }).startOf('day'); // Start of the day X days ago in IST
 
-        console.log(`[Trends Query] Aggregating bookings created from ${startDate.toISO()} (IST) onwards.`);
-        console.log(`[Trends Query] UTC start date for match: ${startDateUTC.toISOString()}`);
+        const startDateUTC = startDateIST.toUTC().toJSDate();
+
+        console.log(`[Trends Query] Aggregating bookings created in IST between ${startDateIST.toISO()} and ${endDateIST.toISO()}.`);
+        console.log(`[Trends Query] Corresponding UTC start date for match: ${startDateUTC.toISOString()}`);
 
 
         const matchStage = {
-            createdAt: { $gte: startDateUTC } // Filter by creation date (UTC)
+            createdAt: { $gte: startDateUTC } // Filter by creation date (which is stored in UTC)
         };
 
-        // Add optional filters
+        // Add optional filters for auditorium and department
         const filtersApplied = {};
-        if (auditoriumIdFilter && mongoose.Types.ObjectId.isValid(auditoriumIdFilter)) {
-            matchStage.auditorium = new mongoose.Types.ObjectId(auditoriumIdFilter);
-            filtersApplied.auditoriumId = auditoriumIdFilter;
-             console.log(`[Trends Query] Filtering by Auditorium: ${auditoriumIdFilter}`);
-        } else if (auditoriumIdFilter) {
-             console.warn(`[Trends Query] Invalid Auditorium ID provided: ${auditoriumIdFilter}. Ignoring filter.`);
+        if (auditoriumIdFilter) {
+            if (mongoose.Types.ObjectId.isValid(auditoriumIdFilter)) {
+                matchStage.auditorium = new mongoose.Types.ObjectId(auditoriumIdFilter);
+                filtersApplied.auditoriumId = auditoriumIdFilter;
+                 console.log(`[Trends Query] Filtering by Auditorium: ${auditoriumIdFilter}`);
+            } else {
+                 console.warn(`[Trends Query] Invalid Auditorium ID provided: ${auditoriumIdFilter}. Ignoring filter.`);
+            }
         }
 
-        if (departmentIdFilter && mongoose.Types.ObjectId.isValid(departmentIdFilter)) {
-             matchStage.department = new mongoose.Types.ObjectId(departmentIdFilter);
-             filtersApplied.departmentId = departmentIdFilter;
-             console.log(`[Trends Query] Filtering by Department: ${departmentIdFilter}`);
-        } else if (departmentIdFilter) {
-             console.warn(`[Trends Query] Invalid Department ID provided: ${departmentIdFilter}. Ignoring filter.`);
+        if (departmentIdFilter) {
+            if (mongoose.Types.ObjectId.isValid(departmentIdFilter)) {
+                 matchStage.department = new mongoose.Types.ObjectId(departmentIdFilter);
+                 filtersApplied.departmentId = departmentIdFilter;
+                 console.log(`[Trends Query] Filtering by Department: ${departmentIdFilter}`);
+            } else {
+                 console.warn(`[Trends Query] Invalid Department ID provided: ${departmentIdFilter}. Ignoring filter.`);
+            }
         }
 
 
@@ -879,30 +999,30 @@ exports.getBookingTrends = async (req, res, next) => {
              { $match: matchStage },
             {
                 $group: {
-                    // Group by date string in IST timezone
+                    // Group by creation date, formatted as YYYY-MM-DD in IST timezone
                      _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: istTimezone } },
-                     count: { $sum: 1 } // Count bookings per day
+                     count: { $sum: 1 } // Count bookings created on that day
                  }
             },
-             { $project: { _id: 0, date: "$_id", count: 1 } }, // Reshape output
+             { $project: { _id: 0, date: "$_id", count: 1 } }, // Reshape output to { date, count }
              { $sort: { date: 1 } } // Sort by date chronologically
          ];
 
         const trendsData = await Booking.aggregate(pipeline);
 
-        // Create a map for quick lookup of counts by date
+        // Create a map for quick lookup of counts by date string
         const trendsMap = new Map(trendsData.map(item => [item.date, item.count]));
 
-        // Generate a complete list of dates in the range and fill counts (defaulting to 0)
+        // Generate a complete list of dates in the range (in IST) and fill counts (defaulting to 0)
         const filledTrends = [];
-        let currentDate = startDate; // Start from the calculated start date in IST
-        while (currentDate <= endDate) {
-            const dateStr = currentDate.toFormat('yyyy-MM-dd');
+        let currentDateIST = startDateIST; // Start from the calculated start date in IST
+        while (currentDateIST <= endDateIST) {
+            const dateStr = currentDateIST.toFormat('yyyy-MM-dd');
             filledTrends.push({
                 date: dateStr,
                 count: trendsMap.get(dateStr) || 0 // Get count from map or default to 0
             });
-            currentDate = currentDate.plus({ days: 1 });
+            currentDateIST = currentDateIST.plus({ days: 1 }); // Move to the next day
         }
 
         res.status(200).json({
@@ -934,20 +1054,22 @@ exports.getAuditoriumAvailability = async (req, res, next) => {
     }
 
     try {
-        // Calculate date range for the query (UTC)
+        // Calculate date range for the query in IST, then convert to UTC
         const startOfMonthLocal = DateTime.local(year, month, 1, { zone: istTimezone }).startOf('month');
-        const endOfMonthLocal = startOfMonthLocal.endOf('month');
+        const endOfMonthLocal = startOfMonthLocal.endOf('month'); // End of the month in IST
+
+        // Convert to UTC Date objects for the database query
         const startUTC = startOfMonthLocal.toUTC().toJSDate();
         const endUTC = endOfMonthLocal.toUTC().toJSDate();
 
-        console.log(`[Availability Query] Fetching booked slots for ${auditoriumId} overlapping month ${year}-${month} (UTC range: ${startUTC.toISOString()} to ${endUTC.toISOString()})`);
+        console.log(`[Availability Query] Fetching booked slots for ${auditoriumId} overlapping month ${year}-${month} (UTC query range: ${startUTC.toISOString()} to ${endUTC.toISOString()})`);
 
-        // Find APPROVED bookings overlapping the requested month
+        // Find APPROVED bookings overlapping the requested month (using UTC dates)
         const bookedSlots = await Booking.find({
             auditorium: auditoriumId,
             status: 'approved',
-            startTime: { $lt: endUTC }, // Starts before month ends
-            endTime: { $gt: startUTC }   // Ends after month starts
+            startTime: { $lt: endUTC }, // Starts before the month ends (UTC)
+            endTime: { $gt: startUTC }   // Ends after the month starts (UTC)
         })
         .select('startTime endTime -_id') // Only select start and end times, exclude _id
         .lean(); // Use lean for performance as we only need plain JS objects
@@ -956,7 +1078,7 @@ exports.getAuditoriumAvailability = async (req, res, next) => {
             success: true,
             message: `Availability data fetched for ${startOfMonthLocal.toFormat('MMMM yyyy')}`,
             count: bookedSlots.length,
-            data: bookedSlots, // Array of {startTime, endTime} objects
+            data: bookedSlots, // Array of {startTime, endTime} objects (UTC dates)
         });
 
     } catch (error) {
@@ -988,8 +1110,11 @@ exports.checkAvailability = async (req, res, next) => {
     }
 
     // --- Date Parsing and Validation ---
-    const startDt = DateTime.fromISO(startTime);
-    const endDt = DateTime.fromISO(endTime);
+    // Note: This endpoint assumes the ISO string *represents* a specific point in time (likely UTC if from frontend JS Date.toISOString())
+    // If your frontend sends IST local time, you'd need to adjust parsing like in validateBookingTime
+    const startDt = DateTime.fromISO(startTime, { setZone: true }); // Use setZone: true to interpret offset if present, or default to UTC if 'Z' is there
+    const endDt = DateTime.fromISO(endTime, { setZone: true });
+
 
     if (!startDt.isValid || !endDt.isValid) {
         return res.status(400).json({
@@ -998,7 +1123,7 @@ exports.checkAvailability = async (req, res, next) => {
         });
     }
     if (startDt >= endDt) {
-        return res.status(400).json({
+        return res.status(400).json({  // Fixed: Added .status()
             success: false,
             message: 'End time must be strictly after start time.'
         });
@@ -1011,19 +1136,32 @@ exports.checkAvailability = async (req, res, next) => {
     try {
         const conflictingBooking = await Booking.findOne({
             auditorium: auditoriumId,
-            status: 'approved',
-            startTime: { $lt: endUTC },
-            endTime: { $gt: startUTC },
-            ...((excludeBookingId && mongoose.Types.ObjectId.isValid(excludeBookingId)) 
-                ? { _id: { $ne: excludeBookingId } } 
+            status: 'approved', // Only approved bookings cause conflicts
+            startTime: { $lt: endUTC }, // Starts before the proposed end time (UTC)
+            endTime: { $gt: startUTC },   // Ends after the proposed start time (UTC)
+            // Exclude a specific booking ID if provided and valid
+            ...((excludeBookingId && mongoose.Types.ObjectId.isValid(excludeBookingId))
+                ? { _id: { $ne: excludeBookingId } }
                 : {})
-        });
+        }).select('eventName startTime endTime'); // Select minimal conflict details
 
         if (conflictingBooking) {
+            console.log(`[Check Availability] Conflict found for auditorium ${auditoriumId} between ${startTime} and ${endTime}. Conflict with booking ${conflictingBooking._id} (${conflictingBooking.eventName}).`);
+            
+            // Add fallback formatting if formatDateTimeIST fails
+            const formatTime = (date) => {
+                try {
+                    return formatDateTimeIST(date);
+                } catch (e) {
+                    return date.toISOString();
+                }
+            };
+
             return res.status(200).json({
                 success: true,
                 available: false,
                 hasConflict: true,
+                message: `Conflicts with approved booking: '${conflictingBooking.eventName}' from ${formatTime(conflictingBooking.startTime)} to ${formatTime(conflictingBooking.endTime)}`,
                 conflictingBooking: {
                     eventName: conflictingBooking.eventName,
                     startTime: conflictingBooking.startTime,
@@ -1032,16 +1170,18 @@ exports.checkAvailability = async (req, res, next) => {
             });
         }
 
+        console.log(`[Check Availability] No conflict found for auditorium ${auditoriumId} between ${startTime} and ${endTime}.`);
         return res.status(200).json({
             success: true,
             available: true,
-            hasConflict: false
+            hasConflict: false,
+             message: 'The selected time slot is available.'
         });
 
     } catch (error) {
         console.error(`[Error] Checking availability for Auditorium ${auditoriumId}:`, error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: 'Server error checking availability.'
         });
     }
@@ -1055,17 +1195,26 @@ exports.checkAvailability = async (req, res, next) => {
 exports.getPublicEvents = async (req, res) => {
     console.log(`GET /api/bookings/public/events requested`);
     try {
-        const now = new Date();
-        // Define upcoming window (e.g., next 7 days)
-        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        // Use Luxon to determine time range based on IST 'now', then convert to UTC for query
+        const nowIST = DateTime.now().setZone(istTimezone);
+        const nowUTC = nowIST.toUTC().toJSDate();
+
+        // Define upcoming window (e.g., next 7 days) based on IST
+        const nextWeekIST = nowIST.plus({ days: 7 });
+        const nextWeekUTC = nextWeekIST.toUTC().toJSDate();
+
+
+        console.log(`[Public Events Query] Fetching approved events that are currently happening (IST time: ${nowIST.toISO()}) or start within the next 7 days (up to IST: ${nextWeekIST.toISO()}).`);
+         console.log(`[Public Events Query] Corresponding UTC query times: ${nowUTC.toISOString()} and ${nextWeekUTC.toISOString()}`);
+
 
         const events = await Booking.find({
-            status: 'approved',
+            status: 'approved', // Only approved events
             $or: [
-                // Events currently happening
-                { startTime: { $lte: now }, endTime: { $gte: now } },
-                // Events starting within the upcoming window
-                { startTime: { $gt: now, $lt: nextWeek } }
+                // Events currently happening (UTC times relative to UTC 'now')
+                { startTime: { $lte: nowUTC }, endTime: { $gte: nowUTC } },
+                // Events starting within the upcoming window (UTC start time relative to UTC 'now' and 'nextWeekUTC')
+                { startTime: { $gt: nowUTC, $lt: nextWeekUTC } }
             ]
         })
         .sort({ startTime: 1 }) // Show in chronological order
@@ -1114,8 +1263,10 @@ exports.checkBookingConflicts = async (req, res) => {
         }
 
          // --- Date Parsing and Validation ---
-        const startDt = DateTime.fromISO(startTime);
-        const endDt = DateTime.fromISO(endTime);
+         // Assume input ISO string represents a specific point in time (likely UTC)
+        const startDt = DateTime.fromISO(startTime, { setZone: true }); // Use setZone: true
+        const endDt = DateTime.fromISO(endTime, { setZone: true });
+
 
         if (!startDt.isValid || !endDt.isValid) {
             return res.status(400).json({
@@ -1136,30 +1287,38 @@ exports.checkBookingConflicts = async (req, res) => {
         // --- Build Conflict Query ---
         const conflictQuery = {
             auditorium: auditoriumId,
-            status: 'approved',
-            startTime: { $lt: endUTC },
-            endTime: { $gt: startUTC }
+            status: 'approved', // Only check against approved bookings
+            startTime: { $lt: endUTC }, // Using UTC dates
+            endTime: { $gt: startUTC } // Using UTC dates
         };
 
-        // Exclude specific booking if ID is provided (for checking edits/reschedules)
-        if (excludeBookingId && mongoose.Types.ObjectId.isValid(excludeBookingId)) {
-            conflictQuery._id = { $ne: excludeBookingId };
-            console.log(`[Conflict Check POST] Excluding booking ID: ${excludeBookingId}`);
-        } else if (excludeBookingId) {
-             console.warn(`[Conflict Check POST] Invalid excludeBookingId provided: ${excludeBookingId}. Ignoring.`);
+        // Exclude specific booking if ID is provided (for checking edits/reschedules) and is valid
+        if (excludeBookingId) {
+            if (mongoose.Types.ObjectId.isValid(excludeBookingId)) {
+                conflictQuery._id = { $ne: new mongoose.Types.ObjectId(excludeBookingId) }; // Use new ObjectId if excludeBookingId is a string
+                 console.log(`[Conflict Check POST] Excluding booking ID: ${excludeBookingId}`);
+            } else {
+                 console.warn(`[Conflict Check POST] Invalid excludeBookingId provided: ${excludeBookingId}. Ignoring exclusion.`);
+            }
         }
 
-
         console.log(`[Conflict Check POST] Querying for auditorium ${auditoriumId} between ${startUTC.toISOString()} and ${endUTC.toISOString()}`);
-        const conflict = await Booking.findOne(conflictQuery).select('_id eventName'); // Select minimal data
+        const conflict = await Booking.findOne(conflictQuery)
+            .populate('auditorium', 'name') // Get auditorium name for message
+            .select('eventName startTime endTime auditorium'); // Select minimal data including auditorium
 
         if (conflict) {
-             console.log(`[Conflict Check POST] Conflict found: Booking ${conflict._id} (${conflict.eventName})`);
+             console.log(`[Conflict Check POST] Conflict found: Booking ${conflict._id} (${conflict.eventName}). Auditorium: ${conflict.auditorium?.name || 'N/A'}`);
             return res.status(200).json({ // Return 200 OK, indicates check completed
                 success: true,
                 hasConflict: true,
-                message: `The selected time slot conflicts with an existing approved booking (${conflict.eventName}).`,
-                conflictingEventName: conflict.eventName // Provide name for user feedback
+                message: `The selected time slot conflicts with an existing approved booking: '${conflict.eventName}' in ${conflict.auditorium?.name || 'Unknown Auditorium'} from ${formatDateTimeIST(conflict.startTime)} to ${formatDateTimeIST(conflict.endTime)}.`,
+                conflictingBooking: { // Provide details about the conflict
+                    eventName: conflict.eventName,
+                    startTime: conflict.startTime, // UTC Date
+                    endTime: conflict.endTime,      // UTC Date
+                    auditoriumName: conflict.auditorium?.name || 'N/A'
+                }
             });
         }
 

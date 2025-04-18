@@ -67,6 +67,14 @@ const ManageBookings = () => {
     return () => clearTimeout(timer); // Return cleanup function
   };
 
+  /** Determines if an event is in the past based on its start time. */
+  const isPastEvent = (startTime) => {
+    if (!startTime) return false;
+    const now = new Date();
+    const eventStart = new Date(startTime);
+    return eventStart < now;
+  };
+
   // --- API Fetch Callbacks ---
 
   /** Fetches all bookings using the admin endpoint. */
@@ -109,19 +117,21 @@ const ManageBookings = () => {
       }
 
       if (data.success && Array.isArray(data.data)) {
-        // Process bookings: ensure department object exists, add id
         const processedBookings = data.data.map((b) => ({
           ...b,
-          id: b._id, // Ensure 'id' field for potential key usage later
-          // Handle potentially missing nested data gracefully
-          department: b.department || { _id: null, name: 'N/A (Missing)' },
-          user: b.user || { _id: null, username: 'N/A', email: 'N/A' }, // Graceful handle missing user
-          auditorium: b.auditorium || { _id: null, name: 'N/A' } // Graceful handle missing auditorium
+          id: b._id,
+          eventName: b.eventName || '',
+          description: b.description || '',
+          status: b.status || 'unknown',
+          department: b.department || { _id: null, name: 'N/A', code: '' },
+          user: b.user || { _id: null, username: 'N/A', email: 'N/A' },
+          auditorium: b.auditorium || { _id: null, name: 'N/A' },
+          startTime: b.startTime || null,
+          endTime: b.endTime || null
         }));
+        
         setAllBookings(processedBookings);
         console.log("[API Response] All bookings received:", processedBookings.length);
-      } else {
-        throw new Error(data.message || "Received invalid data format for bookings.");
       }
     } catch (e) {
       console.error("[Error] Fetch all bookings err:", e);
@@ -184,37 +194,64 @@ const ManageBookings = () => {
 
   // Filtering logic - runs when data or filter criteria change
   useEffect(() => {
-    console.log("[Filtering Admin] Applying filters...", { searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate });
+    console.log("[Filtering Admin] Applying filters and priority sorting...");
+    const now = new Date();
 
-    const filtered = allBookings.filter((b) => {
-      const lowerSearch = searchTerm.toLowerCase();
+    // First, apply filters
+    let filtered = allBookings.filter((b) => {
+      const searchMatch = !searchTerm || [
+        b.eventName,
+        b.user?.email,
+        b.user?.username,
+        b.description,
+        b.department?.name,
+        b.auditorium?.name
+      ].some(field => field?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // Search Match (Event Name, User Email, or User Name)
-      const searchMatch = !searchTerm ||
-        (b.eventName?.toLowerCase().includes(lowerSearch)) ||
-        (b.user?.email?.toLowerCase().includes(lowerSearch)) ||
-        (b.user?.username?.toLowerCase().includes(lowerSearch));
-
-      // Status Match
       const statusMatch = filterStatus === "all" || b.status === filterStatus;
-
-      // Auditorium Match (Uses name from filter dropdown)
-      const auditoriumName = b.auditorium?.name ?? ""; // Handle potential missing data
-      const auditoriumMatch = filterAuditorium === "all" || auditoriumName === filterAuditorium;
-
-      // Department Match (Uses ID from filter dropdown)
-      const departmentMatch = filterDepartment === "all" || b.department?._id === filterDepartment;
-
-      // Date Match (Event starts on this specific date)
-      const dateMatch = !filterDate || (b.startTime && format(parseISO(b.startTime), 'yyyy-MM-dd') === filterDate);
+      const auditoriumMatch = filterAuditorium === "all" || 
+        b.auditorium?.name?.toLowerCase() === filterAuditorium.toLowerCase();
+      const departmentMatch = filterDepartment === "all" || 
+        b.department?._id === filterDepartment;
+      const dateMatch = !filterDate || (b.startTime && 
+        format(parseISO(b.startTime), 'yyyy-MM-dd') === filterDate);
 
       return searchMatch && statusMatch && auditoriumMatch && departmentMatch && dateMatch;
     });
 
-    setFilteredBookings(filtered);
-    console.log("[Filtering Admin] Filter results:", filtered.length);
-  }, [allBookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]); // Re-run when these change
+    // Then, sort with enhanced priority logic
+    filtered.sort((a, b) => {
+      const aStart = a.startTime ? new Date(a.startTime) : null;
+      const bStart = b.startTime ? new Date(b.startTime) : null;
+      const aPast = aStart ? aStart < now : false;
+      const bPast = bStart ? bStart < now : false;
 
+      // First, prioritize non-past pending bookings
+      if (a.status === 'pending' && !aPast && (b.status !== 'pending' || bPast)) return -1;
+      if (b.status === 'pending' && !bPast && (a.status !== 'pending' || aPast)) return 1;
+
+      // Then sort pending by start time
+      if (a.status === 'pending' && b.status === 'pending') {
+        if (!aStart && !bStart) return 0;
+        if (!aStart) return 1;
+        if (!bStart) return -1;
+        return aStart.getTime() - bStart.getTime();
+      }
+
+      // Sort others by most recent first
+      if (!aStart && !bStart) return 0;
+      if (!aStart) return 1;
+      if (!bStart) return -1;
+      return aStart.getTime() - bStart.getTime();
+    });
+
+    setFilteredBookings(filtered);
+    console.log("[Filtering Admin] Filter results:", {
+      total: filtered.length,
+      pending: filtered.filter(b => b.status === 'pending').length,
+      pendingCurrent: filtered.filter(b => b.status === 'pending' && !isPastEvent(b.startTime)).length
+    });
+  }, [allBookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]);
 
   // --- UI Interaction Handlers ---
 
@@ -632,69 +669,77 @@ const ManageBookings = () => {
                           {/* --- Admin Action Area (only for Pending) --- */}
                           {booking.status === "pending" && (
                             <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                              {rejectingBookingId === booking._id ? (
-                                // --- Reject Reason Input Section ---
-                                <div className="p-3 bg-red-50 border border-red-200 rounded-md shadow-sm">
-                                  <label htmlFor={`rr-${booking._id}`} className="block text-sm font-semibold text-red-800 mb-1.5">
-                                    Reason for Rejection <span className="text-red-600">*</span>
-                                  </label>
-                                  <textarea
-                                    id={`rr-${booking._id}`}
-                                    className="w-full p-2 border border-red-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition"
-                                    rows="3"
-                                    value={rejectReasons[booking._id] || ""}
-                                    onChange={(e) => handleReasonChange(booking._id, e.target.value)}
-                                    required
-                                    autoFocus // Focus input when opened
-                                    disabled={isAnyActionInProgress} // Disable textarea if *any* action is running
-                                    aria-describedby={`reason-error-${booking._id}`}
-                                  />
-                                  <div className="flex justify-end space-x-2 mt-2">
+                              {isPastEvent(booking.startTime) ? (
+                                // Show message for past pending bookings
+                                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                                  Event deadline has passed - No action required
+                                </div>
+                              ) : (
+                                // Show action buttons only for future/current pending bookings
+                                rejectingBookingId === booking._id ? (
+                                  // Reject reason input section
+                                  <div className="p-3 bg-red-50 border border-red-200 rounded-md shadow-sm">
+                                    <label htmlFor={`rr-${booking._id}`} className="block text-sm font-semibold text-red-800 mb-1.5">
+                                      Reason for Rejection <span className="text-red-600">*</span>
+                                    </label>
+                                    <textarea
+                                      id={`rr-${booking._id}`}
+                                      className="w-full p-2 border border-red-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition"
+                                      rows="3"
+                                      value={rejectReasons[booking._id] || ""}
+                                      onChange={(e) => handleReasonChange(booking._id, e.target.value)}
+                                      required
+                                      autoFocus
+                                      disabled={isAnyActionInProgress}
+                                      aria-describedby={`reason-error-${booking._id}`}
+                                    />
+                                    <div className="flex justify-end space-x-2 mt-2">
+                                      <button
+                                        onClick={() => handleConfirmReject(booking._id)}
+                                        className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                        disabled={!rejectReasons[booking._id]?.trim() || isAnyActionInProgress || rejectingId === booking._id}
+                                      >
+                                        {rejectingId === booking._id ? "Rejecting..." : "Confirm Reject"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRejectClick(booking._id)}
+                                        disabled={isAnyActionInProgress}
+                                        className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // Default approve/reject buttons
+                                  <div className="flex flex-wrap items-center gap-3">
                                     <button
-                                      onClick={() => handleConfirmReject(booking._id)}
-                                      className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                      // Disable if reason empty OR this specific reject action is processing OR any other action is processing
-                                      disabled={!rejectReasons[booking._id]?.trim() || isAnyActionInProgress || rejectingId === booking._id}
+                                      onClick={() => handleApprove(booking._id)}
+                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                      disabled={isAnyActionInProgress}
                                     >
-                                      {rejectingId === booking._id ? "Rejecting..." : "Confirm Reject"}
+                                      {approvingId === booking._id ? (
+                                        <>
+                                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Approving...
+                                        </>
+                                      ) : (
+                                        "Approve"
+                                      )}
                                     </button>
                                     <button
-                                      type="button" // Prevent form submission if wrapped in form later
-                                      onClick={() => handleRejectClick(booking._id)} // Closes the input
-                                      disabled={isAnyActionInProgress} // Only disable if global action happening
-                                      className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
+                                      onClick={() => handleRejectClick(booking._id)}
+                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                      disabled={isAnyActionInProgress}
                                     >
-                                      Cancel
+                                      Reject
                                     </button>
                                   </div>
-                                </div>
-                                // --- End Reject Input Section ---
-                              ) : (
-                                // --- Default Approve/Reject Buttons ---
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <button
-                                    onClick={() => handleApprove(booking._id)}
-                                    className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                    disabled={isAnyActionInProgress} // Disable if any action is happening
-                                  >
-                                    {approvingId === booking._id ? (
-                                      <>
-                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Approving...
-                                      </>
-                                    ) : (
-                                      "Approve"
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectClick(booking._id)}
-                                    className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                    disabled={isAnyActionInProgress} // Disable if any action is happening
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                                // --- End Default Buttons ---
+                                )
                               )}
                             </div>
                           )}
@@ -747,21 +792,3 @@ const ManageBookings = () => {
 
 export default ManageBookings;
 
-/* Add this CSS to your global stylesheet or a relevant CSS module */
-/* Ensure Tailwind is configured to pick up these classes */
-/*
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer utilities {
-  .animate-fade-in-fast {
-    animation: fadeIn 0.2s ease-out forwards;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; backdrop-filter: blur(0); }
-  to { opacity: 1; backdrop-filter: blur(4px); } // Example blur for backdrop
-}
-*/
