@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { format, parseISO } from 'date-fns';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // --- Placeholder/Error Icon Components ---
 const ImagePlaceholderIcon = () => (
@@ -67,6 +69,20 @@ const ManageBookings = () => {
     return () => clearTimeout(timer); // Return cleanup function
   };
 
+  /** Shows toast notification instead of inline message. */
+  const showToast = (type, message) => {
+    // type can be 'success', 'error', 'info', 'warning'
+    toast[type](message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+
   /** Determines if an event is in the past based on its start time. */
   const isPastEvent = (startTime) => {
     if (!startTime) return false;
@@ -81,8 +97,6 @@ const ManageBookings = () => {
   const fetchAllBookings = useCallback(async () => {
     setIsLoading(true);
     setFetchError("");
-    setActionError(""); // Clear action feedback on refresh
-    setActionSuccess("");
     const token = localStorage.getItem("authToken");
     const userRole = localStorage.getItem("userRole");
 
@@ -117,21 +131,24 @@ const ManageBookings = () => {
       }
 
       if (data.success && Array.isArray(data.data)) {
+        // Process bookings: ensure department object exists, add id
         const processedBookings = data.data.map((b) => ({
           ...b,
-          id: b._id,
-          eventName: b.eventName || '',
-          description: b.description || '',
-          status: b.status || 'unknown',
-          department: b.department || { _id: null, name: 'N/A', code: '' },
-          user: b.user || { _id: null, username: 'N/A', email: 'N/A' },
-          auditorium: b.auditorium || { _id: null, name: 'N/A' },
-          startTime: b.startTime || null,
-          endTime: b.endTime || null
+          id: b._id, // Ensure 'id' field for potential key usage later
+          // Handle potentially missing nested data gracefully
+          department: b.department || { _id: null, name: 'N/A (Missing)' },
+          user: b.user || { _id: null, username: 'N/A', email: 'N/A' }, // Graceful handle missing user
+          auditorium: b.auditorium || { _id: null, name: 'N/A' } // Graceful handle missing auditorium
         }));
-        
         setAllBookings(processedBookings);
         console.log("[API Response] All bookings received:", processedBookings.length);
+        
+        // Remove this toast notification that shows on load
+        // if (processedBookings.length > 0) {
+        //   showToast("info", `Loaded ${processedBookings.length} booking requests`);
+        // }
+      } else {
+        throw new Error(data.message || "Received invalid data format for bookings.");
       }
     } catch (e) {
       console.error("[Error] Fetch all bookings err:", e);
@@ -283,13 +300,11 @@ const ManageBookings = () => {
   const handleApprove = async (bookingId) => {
     if (approvingId || rejectingId) return; // Prevent overlapping actions
 
-    setActionError("");
-    setActionSuccess("");
     setApprovingId(bookingId); // Set loading state for this approval
 
     const token = localStorage.getItem("authToken");
     if (!token) {
-      showTemporaryFeedback(setActionError, "Authentication Error: Please log in again.");
+      showToast("error", "Authentication Error: Please log in again.");
       setApprovingId(null);
       return;
     }
@@ -308,7 +323,7 @@ const ManageBookings = () => {
         throw new Error(data.message || `Approval failed (Status ${response.status})`);
       }
 
-      showTemporaryFeedback(setActionSuccess, data.message || `Booking Approved!`);
+      showToast("success", data.message || `Booking Approved!`);
 
       // Update local state to reflect the change immediately
       // Backend should return the updated booking in data.data
@@ -335,7 +350,7 @@ const ManageBookings = () => {
 
     } catch (e) {
       console.error(`[Error] Approve booking ${bookingId} failed:`, e);
-      showTemporaryFeedback(setActionError, e.message || "Approve action failed.");
+      showToast("error", e.message || "Approve action failed.");
     } finally {
       setApprovingId(null); // Clear loading state regardless of outcome
     }
@@ -347,20 +362,18 @@ const ManageBookings = () => {
 
     const reason = rejectReasons[bookingId]?.trim();
     if (!reason) {
-      showTemporaryFeedback(setActionError, "Rejection reason is required.");
+      showToast("error", "Rejection reason is required.");
       // Keep the input open and focus it for correction
       document.getElementById(`rr-${bookingId}`)?.focus();
       return;
     }
 
-    setActionError("");
-    setActionSuccess("");
     setRejectingId(bookingId); // Set loading state for this rejection
     setRejectingBookingId(null); // Close the input area visually immediately
 
     const token = localStorage.getItem("authToken");
     if (!token) {
-      showTemporaryFeedback(setActionError, "Authentication Error: Please log in again.");
+      showToast("error", "Authentication Error: Please log in again.");
       setRejectingId(null);
       return;
     }
@@ -384,7 +397,7 @@ const ManageBookings = () => {
         throw new Error(data.message || `Rejection failed (Status ${response.status})`);
       }
 
-      showTemporaryFeedback(setActionSuccess, data.message || "Booking Rejected.");
+      showToast("success", data.message || "Booking Rejected.");
 
       // Update local state using the data returned from the backend
       // Ensure all nested objects are preserved or updated
@@ -411,8 +424,7 @@ const ManageBookings = () => {
 
     } catch (e) {
       console.error(`[Error] Reject booking ${bookingId} failed:`, e);
-      showTemporaryFeedback(setActionError, e.message || "Reject action failed.");
-      // Optionally reopen input on failure? Maybe not, let user click reject again.
+      showToast("error", e.message || "Reject action failed.");
     } finally {
       setRejectingId(null); // Clear loading state
     }
@@ -421,6 +433,19 @@ const ManageBookings = () => {
   // --- Component Render ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative">
         <h1 className="text-3xl sm:text-4xl font-bold text-center text-red-800 mb-8 tracking-tight">
           Manage Booking Requests
@@ -437,10 +462,10 @@ const ManageBookings = () => {
             {actionSuccess}
           </div>
         )}
+        {/* --- Loading and Error States --- */}
         {isLoading && (
           <div className="text-center py-16">
             <p className="text-lg text-gray-500 animate-pulse">Loading booking requests...</p>
-            {/* Optional: Add a spinner component here */}
           </div>
         )}
         {fetchError && !isLoading && (
@@ -791,4 +816,3 @@ const ManageBookings = () => {
 };
 
 export default ManageBookings;
-

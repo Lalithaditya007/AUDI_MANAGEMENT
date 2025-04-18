@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import { format, parseISO } from 'date-fns';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // --- Placeholder/Error Icon Components ---
 const ImagePlaceholderIcon = () => (
@@ -42,14 +44,12 @@ function BookingHistory() {
   const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
   const [error, setError] = useState("");
   const [departmentFetchError, setDepartmentFetchError] = useState("");
-  const [actionError, setActionError] = useState(""); // Page-level action errors
   const [modalError, setModalError] = useState("");   // Modal SUBMIT action errors
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterAuditorium, setFilterAuditorium] = useState("all");
   const [filterDepartment, setFilterDepartment] = useState("all");
   const [filterDate, setFilterDate] = useState("");
-  const [actionSuccess, setActionSuccess] = useState("");
   const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [rescheduleBooking, setRescheduleBooking] = useState(null);
@@ -67,7 +67,18 @@ function BookingHistory() {
   const bookingLeadTimeHours = 2; // Configurable lead time
 
   // --- Helper Functions ---
-  const showTemporaryFeedback = (setter, message, duration = 5000) => { setter(message); const timer = setTimeout(() => setter(""), duration); return () => clearTimeout(timer); };
+  // Show toast notification instead of inline messages
+  const showToast = (type, message) => {
+    toast[type](message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
 
   const formatDateTimeForInput = (isoString) => {
     if (!isoString) return ""; try { const dt = new Date(isoString); if (isNaN(dt.getTime())) throw new Error("Invalid date"); const localDt = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000); return localDt.toISOString().slice(0, 16); } catch (e) { console.error("Format date err:", e, isoString); return ""; }
@@ -95,8 +106,70 @@ function BookingHistory() {
   };
 
   // --- Data Fetching Callbacks ---
-  const fetchMyBookings = useCallback(async () => { setIsLoading(true); setError(""); setActionError(""); setActionSuccess(""); const token = localStorage.getItem('authToken'); if (!token) { setError("Auth Error."); setIsLoading(false); return; } const url = `${API_BASE_URL}/api/bookings/mybookings`; console.log("Fetch bookings:", url); try { const res=await fetch(url, {headers: {"Authorization": `Bearer ${token}`, Accept:"json"}}); let data; const ct=res.headers.get('content-type'); if (ct?.includes('json')){data=await res.json();} else {const txt=await res.text(); throw new Error(`Non-JSON(${res.status}): ${txt.slice(0,150)}...`);} if (!res.ok) throw new Error(data.message || `Fetch fail(${res.status})`); if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || "Invalid data."); const p=data.data.map(b => ({...b, id:b._id, department: b.department || {_id:null, name:'N/A'}})); setBookings(p); console.log("Bookings recv:", p.length); } catch (e) { console.error("Fetch err:", e); setError(e.message || "Load err."); setBookings([]); } finally { setIsLoading(false); } }, []);
-  const fetchDepartments = useCallback(async () => { setIsLoadingDepartments(true); setDepartmentFetchError(""); const apiUrl = `${API_BASE_URL}/api/departments`; console.log("Fetch depts:", apiUrl); try { const res=await fetch(apiUrl, {headers:{Accept:'json'}}); if (!res.ok) { let m=`Dept fetch fail(${res.status})`; try { const d=await res.json(); m=d.message||m; } catch (e){} throw new Error(m); } const data=await res.json(); if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || "Invalid format."); setDepartments(data.data); } catch (err) { console.error("Fetch depts err:", err); setDepartmentFetchError(err.message || "Load list err."); setDepartments([]); } finally { setIsLoadingDepartments(false); } }, []);
+  const fetchMyBookings = useCallback(async () => { 
+    setIsLoading(true); 
+    setError(""); 
+    const token = localStorage.getItem('authToken'); 
+    if (!token) { 
+      setError("Auth Error."); 
+      showToast("error", "Authentication error: Please log in again");
+      setIsLoading(false); 
+      return; 
+    } 
+    const url = `${API_BASE_URL}/api/bookings/mybookings`; 
+    console.log("Fetch bookings:", url); 
+    try { 
+      const res=await fetch(url, {headers: {"Authorization": `Bearer ${token}`, Accept:"json"}}); 
+      let data; 
+      const ct=res.headers.get('content-type'); 
+      if (ct?.includes('json')){
+        data=await res.json();
+      } else {
+        const txt=await res.text(); 
+        throw new Error(`Non-JSON(${res.status}): ${txt.slice(0,150)}...`);
+      } 
+      if (!res.ok) throw new Error(data.message || `Fetch fail(${res.status})`); 
+      if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || "Invalid data."); 
+      const p=data.data.map(b => ({...b, id:b._id, department: b.department || {_id:null, name:'N/A'}})); 
+      setBookings(p); 
+      console.log("Bookings recv:", p.length);
+    } catch (e) { 
+      console.error("Fetch err:", e); 
+      setError(e.message || "Load err."); 
+      showToast("error", e.message || "Failed to load bookings"); 
+      setBookings([]); 
+    } finally { 
+      setIsLoading(false); 
+    } 
+  }, []);
+  
+  const fetchDepartments = useCallback(async () => { 
+    setIsLoadingDepartments(true); 
+    setDepartmentFetchError(""); 
+    const apiUrl = `${API_BASE_URL}/api/departments`; 
+    console.log("Fetch depts:", apiUrl); 
+    try { 
+      const res=await fetch(apiUrl, {headers:{Accept:'json'}}); 
+      if (!res.ok) { 
+        let m=`Dept fetch fail(${res.status})`; 
+        try { 
+          const d=await res.json(); 
+          m=d.message||m; 
+        } catch (e){} 
+        throw new Error(m); 
+      } 
+      const data=await res.json(); 
+      if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || "Invalid format."); 
+      setDepartments(data.data); 
+    } catch (err) { 
+      console.error("Fetch depts err:", err); 
+      setDepartmentFetchError(err.message || "Load list err."); 
+      showToast("error", "Failed to load departments: " + (err.message || "Error"));
+      setDepartments([]); 
+    } finally { 
+      setIsLoadingDepartments(false); 
+    } 
+  }, []);
 
   // --- Check Availability (Frontend Helper) ---
   const checkAvailability = useCallback(async (startTime, endTime, auditoriumId, bookingIdToExclude) => {
@@ -112,7 +185,12 @@ function BookingHistory() {
       console.log("API Check Res:", data); setIsModalSlotAvailable(data.available);
       if (!data.available && data.conflictingBooking) setModalConflictDetails(data.conflictingBooking); else setModalConflictDetails(null);
       setModalAvailabilityError("");
-    } catch (error) { console.error('Modal check err:', error); setModalAvailabilityError(`Check fail: ${error.message}`); setIsModalSlotAvailable(false); setModalConflictDetails(null); }
+    } catch (error) { 
+      console.error('Modal check err:', error); 
+      setModalAvailabilityError(`Check fail: ${error.message}`); 
+      setIsModalSlotAvailable(false); 
+      setModalConflictDetails(null); 
+    }
     finally { setIsCheckingModalAvailability(false); }
   }, [bookingLeadTimeHours, getMinDateTimeLocalString]);
 
@@ -162,13 +240,11 @@ function BookingHistory() {
   const confirmWithdraw = async () => {
     if (!withdrawBooking || withdrawingId || isSubmittingReschedule) return;
     
-    setActionError("");
-    setActionSuccess("");
     setWithdrawingId(withdrawBooking._id);
     
     const token = localStorage.getItem('authToken');
     if (!token) {
-        showTemporaryFeedback(setActionError, "Auth Error");
+        showToast("error", "Authentication Error: Please log in again");
         setWithdrawingId(null);
         setShowWithdrawModal(false);
         setWithdrawBooking(null);
@@ -187,27 +263,33 @@ function BookingHistory() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || `Withdrawal failed (${res.status})`);
         
-        showTemporaryFeedback(setActionSuccess, data.message || "Successfully withdrawn!", 7000);
+        showToast("success", data.message || "Successfully withdrawn!");
         setBookings(prev => prev.filter(b => b._id !== withdrawBooking._id));
     } catch (err) {
         console.error(`Withdraw error:`, err);
-        showTemporaryFeedback(setActionError, err.message || "Failed to withdraw booking");
+        showToast("error", err.message || "Failed to withdraw booking");
     } finally {
         setWithdrawingId(null);
         setShowWithdrawModal(false);
         setWithdrawBooking(null);
     }
-};
+  };
 
   // --- Reschedule Modal Handlers ---
   const openRescheduleModal = (bookingId) => {
     if (withdrawingId || isSubmittingReschedule) return;
     const booking = bookings.find(b => b._id === bookingId);
-    if (!booking || booking.status !== 'approved') { showTemporaryFeedback(setActionError, "Only approved can be rescheduled."); return; }
+    if (!booking || booking.status !== 'approved') { 
+      showToast("error", "Only approved bookings can be rescheduled."); 
+      return; 
+    }
     const eventStart = booking.startTime ? parseISO(booking.startTime) : null; const now = new Date(); const minReqTime = new Date(now.getTime()+(bookingLeadTimeHours||2)*36e5);
-    if (!eventStart || eventStart <= minReqTime) { showTemporaryFeedback(setActionError, `Must reschedule >= ${bookingLeadTimeHours}h before start.`); return; }
+    if (!eventStart || eventStart <= minReqTime) { 
+      showToast("error", `Must reschedule at least ${bookingLeadTimeHours}h before start time.`); 
+      return; 
+    }
     // Reset all modal states
-    setIsModalSlotAvailable(true); setModalConflictDetails(null); setIsCheckingModalAvailability(false); setModalAvailabilityError(""); setModalError(""); setActionError(""); setActionSuccess("");
+    setIsModalSlotAvailable(true); setModalConflictDetails(null); setIsCheckingModalAvailability(false); setModalAvailabilityError(""); setModalError("");
     setRescheduleBooking(booking); setModalStartTime(formatDateTimeForInput(booking.startTime)); setModalEndTime(formatDateTimeForInput(booking.endTime)); setIsRescheduleModalOpen(true);
   };
 
@@ -218,34 +300,75 @@ function BookingHistory() {
 
   const handleModalSubmit = async (e) => {
     e.preventDefault();
-    if (isCheckingModalAvailability) { setModalError("Wait check..."); return; }
-    if (!isModalSlotAvailable) { setModalError("Slot unavailable."); return; }
+    if (isCheckingModalAvailability) { 
+      showToast("warning", "Please wait for availability check to complete");
+      return; 
+    }
+    if (!isModalSlotAvailable) { 
+      showToast("error", "Time slot is unavailable");
+      return; 
+    }
     if (!rescheduleBooking || isSubmittingReschedule) return;
     setModalError(""); setIsSubmittingReschedule(true); let startISO, endISO;
     try { // Validation block
         if(!modalStartTime||!modalEndTime) throw new Error("Times required."); const s=new Date(modalStartTime), n=new Date(modalEndTime); if(isNaN(s)||isNaN(n))throw new Error("Invalid format."); if(s>=n)throw new Error("End>start req."); const minS=new Date(new Date().getTime()+(bookingLeadTimeHours||2)*36e5); if (s<minS)throw new Error(`Start >= ${bookingLeadTimeHours}h ahead.`); if (formatDateTimeForInput(rescheduleBooking.startTime)===modalStartTime && formatDateTimeForInput(rescheduleBooking.endTime)===modalEndTime) throw new Error("Times unchanged."); startISO=s.toISOString(); endISO=n.toISOString();}
-    catch (vErr) { setModalError(vErr.message); setIsSubmittingReschedule(false); return; }
-    const token = localStorage.getItem('authToken'); if (!token) { setModalError("Auth Err."); setIsSubmittingReschedule(false); return; }
+    catch (vErr) { 
+      setModalError(vErr.message); 
+      showToast("error", vErr.message);
+      setIsSubmittingReschedule(false); 
+      return; 
+    }
+    const token = localStorage.getItem('authToken'); 
+    if (!token) { 
+      setModalError("Auth Err."); 
+      showToast("error", "Authentication Error: Please log in again");
+      setIsSubmittingReschedule(false); 
+      return; 
+    }
     const apiUrl = `${API_BASE_URL}/api/bookings/${rescheduleBooking._id}`;
     try { // API Call block
         const res = await fetch(apiUrl, { method:"PUT", headers:{ "Authorization":`Bearer ${token}`, "Content-Type":"application/json", Accept:"json" }, body:JSON.stringify({ newStartTime: startISO, newEndTime: endISO }) });
         let data; const ct=res.headers.get("content-type"); if(ct?.includes('json')){data=await res.json();} else {const txt=await res.text();throw new Error(`Non-JSON(${res.status}): ${txt.slice(0,150)}...`);}
         if (!res.ok) throw new Error(data.message||`Resched fail(${res.status})`);
-        showTemporaryFeedback(setActionSuccess, data.message || "Reschedule sent!", 7000); setBookings(prev => prev.map(b => (b._id === rescheduleBooking._id ? { ...data.data, id: data.data._id } : b))); closeRescheduleModal(); }
+        showToast("success", data.message || "Reschedule request sent!");
+        setBookings(prev => prev.map(b => (b._id === rescheduleBooking._id ? { ...data.data, id: data.data._id } : b))); 
+        closeRescheduleModal(); 
+    }
     catch (err) { // API Error handling
         console.error(`Resched API err:`, err);
-        if(err.message?.toLowerCase().includes("conflict")) { setModalError("Submit fail: Slot conflict."); checkAvailability(modalStartTime, modalEndTime, rescheduleBooking.auditorium?._id, rescheduleBooking._id); } // Recheck on conflict
-        else { setModalError(err.message || "Error submitting."); } }
-    finally { setIsSubmittingReschedule(false); }
+        if(err.message?.toLowerCase().includes("conflict")) { 
+          setModalError("Submit fail: Slot conflict."); 
+          showToast("error", "Selected time slot has a conflict");
+          checkAvailability(modalStartTime, modalEndTime, rescheduleBooking.auditorium?._id, rescheduleBooking._id); 
+        } // Recheck on conflict
+        else { 
+          setModalError(err.message || "Error submitting."); 
+          showToast("error", err.message || "Error submitting reschedule request");
+        } 
+    }
+    finally { 
+      setIsSubmittingReschedule(false); 
+    }
   };
 
   // --- Render Component UI ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative">
         <h1 className="text-3xl sm:text-4xl font-bold text-center text-red-800 mb-8 tracking-tight"> My Booking History </h1>
-        {actionError && (<div className="mb-6 p-3 text-center text-sm font-medium text-red-800 bg-red-100 rounded-md border border-red-200 shadow-sm" role="alert">{actionError}</div>)}
-        {actionSuccess && (<div className="mb-6 p-3 text-center text-sm font-medium text-green-800 bg-green-100 rounded-md border border-green-200 shadow-sm" role="alert">{actionSuccess}</div>)}
         {isLoading && (<div className="text-center py-16"><p className="text-lg text-gray-500 animate-pulse">Loading...</p></div>)}
         {error && !isLoading && (<div className="my-8 p-4 text-center text-red-800 bg-red-100 rounded-lg border border-red-200 shadow"><p><strong>Error:</strong> {error}</p><button onClick={fetchMyBookings} className="mt-2 px-3 py-1 text-sm font-medium rounded bg-red-600 text-white hover:bg-red-700">Retry</button></div>)}
 

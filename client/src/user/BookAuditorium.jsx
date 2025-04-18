@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // --- Helper Components ---
 
@@ -67,6 +69,21 @@ function debounce(func, wait) {
     };
 }
 // --- End Debounce Function ---
+
+
+// --- Helper: Show toast notification ---
+const showToast = (type, message) => {
+  // type can be 'success', 'error', 'info', 'warning'
+  toast[type](message, {
+    position: "top-right",
+    autoClose: 5000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+  });
+};
 
 
 // --- Main Booking Component ---
@@ -324,29 +341,81 @@ function BookAuditorium({ userEmail = "" }) {
   // --- Form Submission Handler ---
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitError(""); setSuccessMessage("");
-    if (isCheckingAvailability) { showTemporaryFeedback(setSubmitError, "Please wait, checking availability..."); return; }
-    if (!isSlotAvailable) { showTemporaryFeedback(setSubmitError, "Cannot submit: Slot unavailable or input invalid."); return; }
-    if (!formData.eventName || !formData.startTime || !formData.endTime || !formData.auditoriumId || !formData.departmentId) { showTemporaryFeedback(setSubmitError, "Please fill all required fields (*)."); return; }
-    try { const start = new Date(formData.startTime); const end = new Date(formData.endTime); if (isNaN(start.getTime()) || isNaN(end.getTime())) throw new Error("Invalid date."); if (start >= end) throw new Error("End time must be after start."); }
-    catch (validationError) { showTemporaryFeedback(setSubmitError, validationError.message); return; }
-    setIsSubmitting(true); console.log("[DEBUG] Submit initiated.");
-    const token = localStorage.getItem('authToken'); if (!token) { showTemporaryFeedback(setSubmitError, "Auth Error."); setIsSubmitting(false); return; }
-    const formDataToSend = new FormData(); formDataToSend.append('eventName', formData.eventName); formDataToSend.append('description', formData.description); formDataToSend.append('startTime', new Date(formData.startTime).toISOString()); formDataToSend.append('endTime', new Date(formData.endTime).toISOString()); formDataToSend.append('auditorium', formData.auditoriumId); formDataToSend.append('department', formData.departmentId); if (formData.eventPoster) { formDataToSend.append('eventPoster', formData.eventPoster, formData.eventPoster.name); }
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings`; console.log("[DEBUG] POST to", apiUrl);
+    if (isCheckingAvailability) { 
+      showToast("warning", "Please wait, checking availability..."); 
+      return; 
+    }
+    if (!isSlotAvailable) { 
+      showToast("error", "Cannot submit: Slot unavailable or input invalid."); 
+      return; 
+    }
+    if (!formData.eventName || !formData.startTime || !formData.endTime || !formData.auditoriumId || !formData.departmentId) { 
+      showToast("error", "Please fill all required fields (*)."); 
+      return; 
+    }
+    try { 
+      const start = new Date(formData.startTime); 
+      const end = new Date(formData.endTime); 
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) throw new Error("Invalid date."); 
+      if (start >= end) throw new Error("End time must be after start."); 
+    }
+    catch (validationError) { 
+      showToast("error", validationError.message); 
+      return; 
+    }
+    setIsSubmitting(true); 
+    console.log("[DEBUG] Submit initiated.");
+    const token = localStorage.getItem('authToken'); 
+    if (!token) { 
+      showToast("error", "Authentication Error: Please log in again."); 
+      setIsSubmitting(false); 
+      return; 
+    }
+    const formDataToSend = new FormData(); 
+    formDataToSend.append('eventName', formData.eventName); 
+    formDataToSend.append('description', formData.description); 
+    formDataToSend.append('startTime', new Date(formData.startTime).toISOString()); 
+    formDataToSend.append('endTime', new Date(formData.endTime).toISOString()); 
+    formDataToSend.append('auditorium', formData.auditoriumId); 
+    formDataToSend.append('department', formData.departmentId); 
+    if (formData.eventPoster) { 
+      formDataToSend.append('eventPoster', formData.eventPoster, formData.eventPoster.name); 
+    }
+    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings`; 
+    console.log("[DEBUG] POST to", apiUrl);
     try {
       const response = await fetch(apiUrl, { method: "POST", headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json", }, body: formDataToSend, });
-      let responseData; const contentType = response.headers.get("content-type"); if (contentType?.includes("application/json")) { responseData = await response.json(); } else { const text = await response.text(); if (!response.ok) throw new Error(text || `Server error ${response.status}`); else responseData = { success: true, message: 'Success (non-JSON).', data: null }; }
+      let responseData; 
+      const contentType = response.headers.get("content-type"); 
+      if (contentType?.includes("application/json")) { 
+        responseData = await response.json(); 
+      } else { 
+        const text = await response.text(); 
+        if (!response.ok) throw new Error(text || `Server error ${response.status}`); 
+        else responseData = { success: true, message: 'Success (non-JSON).', data: null }; 
+      }
       if (!response.ok || !responseData.success) throw new Error(responseData.message || `Submit failed.`);
-      const successMsg = responseData.message || "Booking submitted!"; showTemporaryFeedback(setSuccessMessage, successMsg, 7000);
-      setFormData({ eventName: "", description: "", startTime: "", endTime: "", auditoriumId: "", departmentId: "", eventPoster: null }); removePoster();
-      setIsSlotAvailable(true); setAvailabilityError(""); setConflictingBookingDetails(null); // Reset check state
+      const successMsg = responseData.message || "Booking submitted!"; 
+      showToast("success", successMsg);
+      setFormData({ eventName: "", description: "", startTime: "", endTime: "", auditoriumId: "", departmentId: "", eventPoster: null }); 
+      removePoster();
+      setIsSlotAvailable(true); 
+      setAvailabilityError(""); 
+      setConflictingBookingDetails(null); // Reset check state
     } catch (err) {
       console.error("Submit error:", err);
-      if (err.message?.toLowerCase().includes("conflict") || err.message?.toLowerCase().includes("overlaps")) { setSubmitError("Submit failed: Slot already booked."); setIsSlotAvailable(false); }
-      else { setSubmitError(err.message || "Error submitting."); }
-    } finally { setIsSubmitting(false); console.log("[DEBUG] Submit finished."); }
-  } // --- End handleSubmit ---
+      if (err.message?.toLowerCase().includes("conflict") || err.message?.toLowerCase().includes("overlaps")) { 
+        showToast("error", "Submit failed: Slot already booked."); 
+        setIsSlotAvailable(false); 
+      }
+      else { 
+        showToast("error", err.message || "Error submitting."); 
+      }
+    } finally { 
+      setIsSubmitting(false); 
+      console.log("[DEBUG] Submit finished."); 
+    }
+  }
 
   const getMinDateTimeLocal = () => {
       const now = new Date(); const minDate = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // 2 hours ahead
@@ -357,6 +426,18 @@ function BookAuditorium({ userEmail = "" }) {
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 py-10 sm:py-16 px-4 sm:px-6 lg:px-8">
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
         <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
           <div className="bg-red-700 p-4 sm:p-6 text-center">
             <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight"> Auditorium Booking Request Form </h2>
@@ -470,29 +551,69 @@ function BookAuditorium({ userEmail = "" }) {
                     The requested time slot overlaps with existing bookings:
                   </p>
                   <ul className="mt-3 space-y-2 text-sm">
-                    {conflicts.slice(0, 3).map((booking, idx) => (
-                      <li key={idx} className="bg-white bg-opacity-50 rounded p-2 border border-blue-100">
-                        <div className="font-medium text-blue-900">{booking.eventName}</div>
-                        <div className="text-blue-600 text-xs mt-1">
-                          {new Date(booking.startTime).toLocaleDateString('en-US', { 
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                          {' '}
-                          {new Date(booking.startTime).toLocaleTimeString('en-US', { 
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })} 
-                          {' - '}
-                          {new Date(booking.endTime).toLocaleTimeString('en-US', { 
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </li>
-                    ))}
+                    {conflicts.slice(0, 3).map((booking, idx) => {
+                      // Format the dates properly
+                      const startDate = new Date(booking.startTime);
+                      const endDate = new Date(booking.endTime);
+                      
+                      // Check if dates are valid before formatting
+                      const isValidDate = !isNaN(startDate.getTime()) && !isNaN(endDate.getTime());
+                      
+                      // Check if it's a multi-day event
+                      const isMultiDay = isValidDate && 
+                        startDate.toDateString() !== endDate.toDateString();
+                      
+                      return (
+                        <li key={idx} className="bg-white bg-opacity-50 rounded p-2 border border-blue-100">
+                          <div className="font-medium text-blue-900">{booking.eventName}</div>
+                          {isValidDate ? (
+                            <div className="text-blue-600 text-xs mt-1">
+                              <span>
+                                {startDate.toLocaleDateString('en-US', { 
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric', 
+                                  year: 'numeric'
+                                })} {' '}
+                                {startDate.toLocaleTimeString('en-US', { 
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
+                              </span>
+                              
+                              {' - '}
+                              
+                              <span>
+                                {isMultiDay && (
+                                  <>{endDate.toLocaleDateString('en-US', { 
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })} {' '}</>
+                                )}
+                                {endDate.toLocaleTimeString('en-US', { 
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
+                              </span>
+                              
+                              {isMultiDay && (
+                                <div className="text-xs mt-0.5 font-semibold text-red-600">
+                                  (Multi-day event)
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-red-500 text-xs mt-1">
+                              Invalid date format
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                   {conflicts.length > 3 && (
                     <p className="text-sm text-blue-600 mt-2 italic">
