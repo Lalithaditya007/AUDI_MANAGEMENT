@@ -22,6 +22,7 @@ const ImageErrorPlaceholder = () => (
 
 // Not used directly, but good practice if you have an error fallback URL
 // const ERROR_IMAGE_URL = "https://via.placeholder.com/150/FFEBEE/D32F2F?text=Load+Error";
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 // --- Main Component ---
 
@@ -66,6 +67,14 @@ const ManageBookings = () => {
     return () => clearTimeout(timer); // Return cleanup function
   };
 
+  /** Determines if an event is in the past based on its start time. */
+  const isPastEvent = (startTime) => {
+    if (!startTime) return false;
+    const now = new Date();
+    const eventStart = new Date(startTime);
+    return eventStart < now;
+  };
+
   // --- API Fetch Callbacks ---
 
   /** Fetches all bookings using the admin endpoint. */
@@ -83,7 +92,7 @@ const ManageBookings = () => {
       return;
     }
 
-    const apiUrl = `${import.meta.env.VITE_API_URL || "http://localhost:5001"}/api/bookings/admin/all`;
+    const apiUrl = `${API_BASE_URL}/api/bookings/admin/all`;
     console.log("[API Call] Fetching ALL bookings (Admin):", apiUrl);
 
     try {
@@ -108,17 +117,21 @@ const ManageBookings = () => {
       }
 
       if (data.success && Array.isArray(data.data)) {
-        // Process bookings: ensure department object exists, add id
         const processedBookings = data.data.map((b) => ({
           ...b,
-          id: b._id, // Ensure 'id' field for potential key usage later
-          // Handle potentially missing nested data gracefully
-          department: b.department || { _id: null, name: 'N/A (Missing)' }
+          id: b._id,
+          eventName: b.eventName || '',
+          description: b.description || '',
+          status: b.status || 'unknown',
+          department: b.department || { _id: null, name: 'N/A', code: '' },
+          user: b.user || { _id: null, username: 'N/A', email: 'N/A' },
+          auditorium: b.auditorium || { _id: null, name: 'N/A' },
+          startTime: b.startTime || null,
+          endTime: b.endTime || null
         }));
+        
         setAllBookings(processedBookings);
         console.log("[API Response] All bookings received:", processedBookings.length);
-      } else {
-        throw new Error(data.message || "Received invalid data format for bookings.");
       }
     } catch (e) {
       console.error("[Error] Fetch all bookings err:", e);
@@ -133,7 +146,7 @@ const ManageBookings = () => {
   const fetchDepartments = useCallback(async () => {
     setIsLoadingDepartments(true);
     setDepartmentFetchError("");
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/departments`;
+    const apiUrl = `${API_BASE_URL}/api/departments`;
     console.log("[API Call] Fetching departments for filter (Admin):", apiUrl);
     // Assuming departments are public or using the same admin token logic if needed
     // const token = localStorage.getItem("authToken");
@@ -181,37 +194,64 @@ const ManageBookings = () => {
 
   // Filtering logic - runs when data or filter criteria change
   useEffect(() => {
-    console.log("[Filtering Admin] Applying filters...", { searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate });
+    console.log("[Filtering Admin] Applying filters and priority sorting...");
+    const now = new Date();
 
-    const filtered = allBookings.filter((b) => {
-      const lowerSearch = searchTerm.toLowerCase();
+    // First, apply filters
+    let filtered = allBookings.filter((b) => {
+      const searchMatch = !searchTerm || [
+        b.eventName,
+        b.user?.email,
+        b.user?.username,
+        b.description,
+        b.department?.name,
+        b.auditorium?.name
+      ].some(field => field?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // Search Match (Event Name, User Email, or User Name)
-      const searchMatch = !searchTerm ||
-        (b.eventName?.toLowerCase().includes(lowerSearch)) ||
-        (b.user?.email?.toLowerCase().includes(lowerSearch)) ||
-        (b.user?.username?.toLowerCase().includes(lowerSearch));
-
-      // Status Match
       const statusMatch = filterStatus === "all" || b.status === filterStatus;
-
-      // Auditorium Match (Uses name from filter dropdown)
-      const auditoriumName = b.auditorium?.name ?? ""; // Handle potential missing data
-      const auditoriumMatch = filterAuditorium === "all" || auditoriumName === filterAuditorium;
-
-      // Department Match (Uses ID from filter dropdown)
-      const departmentMatch = filterDepartment === "all" || b.department?._id === filterDepartment;
-
-      // Date Match (Event starts on this specific date)
-      const dateMatch = !filterDate || (b.startTime && format(parseISO(b.startTime), 'yyyy-MM-dd') === filterDate);
+      const auditoriumMatch = filterAuditorium === "all" || 
+        b.auditorium?.name?.toLowerCase() === filterAuditorium.toLowerCase();
+      const departmentMatch = filterDepartment === "all" || 
+        b.department?._id === filterDepartment;
+      const dateMatch = !filterDate || (b.startTime && 
+        format(parseISO(b.startTime), 'yyyy-MM-dd') === filterDate);
 
       return searchMatch && statusMatch && auditoriumMatch && departmentMatch && dateMatch;
     });
 
-    setFilteredBookings(filtered);
-    console.log("[Filtering Admin] Filter results:", filtered.length);
-  }, [allBookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]); // Re-run when these change
+    // Then, sort with enhanced priority logic
+    filtered.sort((a, b) => {
+      const aStart = a.startTime ? new Date(a.startTime) : null;
+      const bStart = b.startTime ? new Date(b.startTime) : null;
+      const aPast = aStart ? aStart < now : false;
+      const bPast = bStart ? bStart < now : false;
 
+      // First, prioritize non-past pending bookings
+      if (a.status === 'pending' && !aPast && (b.status !== 'pending' || bPast)) return -1;
+      if (b.status === 'pending' && !bPast && (a.status !== 'pending' || aPast)) return 1;
+
+      // Then sort pending by start time
+      if (a.status === 'pending' && b.status === 'pending') {
+        if (!aStart && !bStart) return 0;
+        if (!aStart) return 1;
+        if (!bStart) return -1;
+        return aStart.getTime() - bStart.getTime();
+      }
+
+      // Sort others by most recent first
+      if (!aStart && !bStart) return 0;
+      if (!aStart) return 1;
+      if (!bStart) return -1;
+      return aStart.getTime() - bStart.getTime();
+    });
+
+    setFilteredBookings(filtered);
+    console.log("[Filtering Admin] Filter results:", {
+      total: filtered.length,
+      pending: filtered.filter(b => b.status === 'pending').length,
+      pendingCurrent: filtered.filter(b => b.status === 'pending' && !isPastEvent(b.startTime)).length
+    });
+  }, [allBookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]);
 
   // --- UI Interaction Handlers ---
 
@@ -254,7 +294,7 @@ const ManageBookings = () => {
       return;
     }
 
-    const url = `${import.meta.env.VITE_API_URL || "http://localhost:5001"}/api/bookings/${bookingId}/approve`;
+    const url = `${API_BASE_URL}/api/bookings/${bookingId}/approve`;
     console.log(`[API Call] Approving booking ${bookingId} (PUT ${url})`);
 
     try {
@@ -272,9 +312,21 @@ const ManageBookings = () => {
 
       // Update local state to reflect the change immediately
       // Backend should return the updated booking in data.data
+      // Ensure all nested objects are preserved or updated
       setAllBookings((prev) =>
-        prev.map((b) => (b._id === bookingId ? { ...data.data, id: data.data._id } : b))
+        prev.map((b) =>
+          b._id === bookingId
+            ? { ...b, // Keep existing non-updated fields
+                ...data.data, // Apply updates from backend response
+                id: data.data._id, // Ensure ID is present
+                department: data.data.department || b.department, // Preserve if backend doesn't return it fully
+                user: data.data.user || b.user,
+                auditorium: data.data.auditorium || b.auditorium,
+              }
+            : b // Keep other bookings unchanged
+        )
       );
+
 
       // Close reject input if it was open for this booking
       if (rejectingBookingId === bookingId) {
@@ -313,7 +365,7 @@ const ManageBookings = () => {
       return;
     }
 
-    const url = `${import.meta.env.VITE_API_URL || "http://localhost:5001"}/api/bookings/${bookingId}/reject`;
+    const url = `${API_BASE_URL}/api/bookings/${bookingId}/reject`;
     console.log(`[API Call] Rejecting booking ${bookingId} (PUT ${url}) with reason.`);
 
     try {
@@ -335,8 +387,19 @@ const ManageBookings = () => {
       showTemporaryFeedback(setActionSuccess, data.message || "Booking Rejected.");
 
       // Update local state using the data returned from the backend
+      // Ensure all nested objects are preserved or updated
       setAllBookings((prev) =>
-        prev.map((b) => (b._id === bookingId ? { ...data.data, id: data.data._id } : b))
+        prev.map((b) =>
+          b._id === bookingId
+            ? { ...b, // Keep existing non-updated fields
+                ...data.data, // Apply updates from backend response
+                id: data.data._id, // Ensure ID is present
+                department: data.data.department || b.department, // Preserve if backend doesn't return it fully
+                user: data.data.user || b.user,
+                auditorium: data.data.auditorium || b.auditorium,
+              }
+            : b // Keep other bookings unchanged
+        )
       );
 
       // Clear the stored reason after successful rejection
@@ -381,11 +444,11 @@ const ManageBookings = () => {
           </div>
         )}
         {fetchError && !isLoading && (
-          <div class="mb-8 p-4 text-center text-red-800 bg-red-100 rounded-lg border border-red-200 shadow">
+          <div className="mb-8 p-4 text-center text-red-800 bg-red-100 rounded-lg border border-red-200 shadow">
             <p><strong>Error loading requests:</strong> {fetchError}</p>
             <button
               onClick={fetchAllBookings}
-              className="mt-2 px-3 py-1 text-sm font-medium rounded bg-red-600 text-white hover:bg-red-700"
+              className="mt-2 px-3 py-1 text-sm font-medium rounded bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
               Retry
             </button>
@@ -405,14 +468,16 @@ const ManageBookings = () => {
                   placeholder="🔍 Search Event/User..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-red-500 focus:border-red-500 transition"
+                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all duration-150 hover:border-red-400"
                   aria-label="Search by event name, user email, or username"
                 />
                 {/* Status Filter */}
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-red-500 focus:border-red-500 transition"
+                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all duration-150 hover:border-red-400 bg-white appearance-none
+                             [&>option]:bg-white [&>option]:text-gray-800 [&>option]:p-2
+                             [&>option:checked]:font-semibold [&>option:checked]:bg-red-500 [&>option:checked]:text-white" // Attempt styling selected - results vary by browser
                   aria-label="Filter by status"
                 >
                   <option value="all">All Status</option>
@@ -424,7 +489,9 @@ const ManageBookings = () => {
                 <select
                   value={filterAuditorium}
                   onChange={(e) => setFilterAuditorium(e.target.value)}
-                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-red-500 focus:border-red-500 transition"
+                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all duration-150 hover:border-red-400 bg-white appearance-none
+                             [&>option]:bg-white [&>option]:text-gray-800 [&>option]:p-2
+                             [&>option:checked]:font-semibold [&>option:checked]:bg-red-500 [&>option:checked]:text-white" // Attempt styling selected
                   aria-label="Filter by auditorium"
                 >
                   <option value="all">All Auditoriums</option>
@@ -441,7 +508,10 @@ const ManageBookings = () => {
                 <select
                   value={filterDepartment}
                   onChange={(e) => setFilterDepartment(e.target.value)}
-                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-red-500 focus:border-red-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all duration-150 hover:border-red-400 bg-white appearance-none
+                             disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-70
+                             [&>option]:bg-white [&>option]:text-gray-800 [&>option]:p-2
+                             [&>option:checked]:font-semibold [&>option:checked]:bg-red-500 [&>option:checked]:text-white" // Attempt styling selected
                   aria-label="Filter by department"
                   disabled={isLoadingDepartments || !!departmentFetchError || departments.length === 0}
                 >
@@ -463,7 +533,7 @@ const ManageBookings = () => {
                   type="date"
                   value={filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
-                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-red-500 focus:border-red-500 transition"
+                  className="p-2 px-3 rounded-md border border-gray-300 shadow-sm w-full text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all duration-150 hover:border-red-400"
                   aria-label="Filter by event start date"
                 />
               </div>
@@ -494,9 +564,13 @@ const ManageBookings = () => {
                 {filteredBookings.map((booking) => {
                   // Determine image status
                   const imagePath = booking.eventImages?.[0];
+                  // Construct URL relative to API base URL if path is relative
                   const fullImageUrl = imagePath
-                    ? `${import.meta.env.VITE_API_URL || "http://localhost:5001"}/uploads/${imagePath.split('/').pop()}`
+                    ? imagePath.startsWith('http')
+                      ? imagePath // Assume absolute URL
+                      : `${API_BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}` // Construct full URL
                     : null;
+
                   const imgHasError = imgErrors[booking._id] || false; // Check specific error state
 
                   // Determine if actions should be disabled
@@ -511,7 +585,7 @@ const ManageBookings = () => {
                         <div
                           className={`flex-shrink-0 w-full md:w-44 h-44 rounded-lg shadow bg-gray-100 flex items-center justify-center overflow-hidden text-gray-400 relative ${fullImageUrl && !imgHasError ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
                           onClick={() => fullImageUrl && !imgHasError && setZoomedImageUrl(fullImageUrl)}
-                          title={fullImageUrl && !imgHasError ? "Click to zoom poster" : "No poster available"}
+                          title={fullImageUrl && !imgHasError ? "Click to zoom poster" : "No poster available or error loading"}
                         >
                           {!imgHasError && fullImageUrl ? (
                             <img
@@ -559,11 +633,11 @@ const ManageBookings = () => {
                           <div className="text-xs sm:text-sm text-gray-500 space-y-1.5 border-t border-gray-100 pt-2.5 mt-2.5">
                             <p>
                               <strong className="font-medium text-gray-700 w-20 inline-block">User:</strong>
-                              {booking.user?.username ?? booking.user?.email ?? "N/A"}
+                              {booking.user?.username ?? booking.user?.email ?? <span className="italic">N/A</span>}
                             </p>
                             <p>
                               <strong className="font-medium text-gray-700 w-20 inline-block">Email:</strong>
-                              {booking.user?.email ?? "N/A"}
+                              {booking.user?.email ?? <span className="italic">N/A</span>}
                             </p>
                             <p>
                               <strong className="font-medium text-gray-700 w-20 inline-block">Dept:</strong>
@@ -572,7 +646,7 @@ const ManageBookings = () => {
                             </p>
                             <p>
                               <strong className="font-medium text-gray-700 w-20 inline-block">Auditorium:</strong>
-                              {booking.auditorium?.name ?? "N/A"}
+                              {booking.auditorium?.name ?? <span className="italic">N/A</span>}
                             </p>
                             <p>
                               <strong className="font-medium text-gray-700 w-20 inline-block">From:</strong>
@@ -595,69 +669,77 @@ const ManageBookings = () => {
                           {/* --- Admin Action Area (only for Pending) --- */}
                           {booking.status === "pending" && (
                             <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                              {rejectingBookingId === booking._id ? (
-                                // --- Reject Reason Input Section ---
-                                <div className="p-3 bg-red-50 border border-red-200 rounded-md shadow-sm">
-                                  <label htmlFor={`rr-${booking._id}`} className="block text-sm font-semibold text-red-800 mb-1.5">
-                                    Reason for Rejection <span className="text-red-600">*</span>
-                                  </label>
-                                  <textarea
-                                    id={`rr-${booking._id}`}
-                                    className="w-full p-2 border border-red-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition"
-                                    rows="3"
-                                    value={rejectReasons[booking._id] || ""}
-                                    onChange={(e) => handleReasonChange(booking._id, e.target.value)}
-                                    required
-                                    autoFocus // Focus input when opened
-                                    disabled={isAnyActionInProgress} // Disable textarea if *any* action is running
-                                    aria-describedby={`reason-error-${booking._id}`}
-                                  />
-                                  <div className="flex justify-end space-x-2 mt-2">
+                              {isPastEvent(booking.startTime) ? (
+                                // Show message for past pending bookings
+                                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                                  Event deadline has passed - No action required
+                                </div>
+                              ) : (
+                                // Show action buttons only for future/current pending bookings
+                                rejectingBookingId === booking._id ? (
+                                  // Reject reason input section
+                                  <div className="p-3 bg-red-50 border border-red-200 rounded-md shadow-sm">
+                                    <label htmlFor={`rr-${booking._id}`} className="block text-sm font-semibold text-red-800 mb-1.5">
+                                      Reason for Rejection <span className="text-red-600">*</span>
+                                    </label>
+                                    <textarea
+                                      id={`rr-${booking._id}`}
+                                      className="w-full p-2 border border-red-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition"
+                                      rows="3"
+                                      value={rejectReasons[booking._id] || ""}
+                                      onChange={(e) => handleReasonChange(booking._id, e.target.value)}
+                                      required
+                                      autoFocus
+                                      disabled={isAnyActionInProgress}
+                                      aria-describedby={`reason-error-${booking._id}`}
+                                    />
+                                    <div className="flex justify-end space-x-2 mt-2">
+                                      <button
+                                        onClick={() => handleConfirmReject(booking._id)}
+                                        className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                        disabled={!rejectReasons[booking._id]?.trim() || isAnyActionInProgress || rejectingId === booking._id}
+                                      >
+                                        {rejectingId === booking._id ? "Rejecting..." : "Confirm Reject"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRejectClick(booking._id)}
+                                        disabled={isAnyActionInProgress}
+                                        className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // Default approve/reject buttons
+                                  <div className="flex flex-wrap items-center gap-3">
                                     <button
-                                      onClick={() => handleConfirmReject(booking._id)}
-                                      className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                      // Disable if reason empty OR this specific reject action is processing OR any other action is processing
-                                      disabled={!rejectReasons[booking._id]?.trim() || isAnyActionInProgress || rejectingId === booking._id}
+                                      onClick={() => handleApprove(booking._id)}
+                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                      disabled={isAnyActionInProgress}
                                     >
-                                      {rejectingId === booking._id ? "Rejecting..." : "Confirm Reject"}
+                                      {approvingId === booking._id ? (
+                                        <>
+                                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Approving...
+                                        </>
+                                      ) : (
+                                        "Approve"
+                                      )}
                                     </button>
                                     <button
-                                      type="button" // Prevent form submission if wrapped in form later
-                                      onClick={() => handleRejectClick(booking._id)} // Closes the input
-                                      disabled={isAnyActionInProgress} // Only disable if global action happening
-                                      className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
+                                      onClick={() => handleRejectClick(booking._id)}
+                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                      disabled={isAnyActionInProgress}
                                     >
-                                      Cancel
+                                      Reject
                                     </button>
                                   </div>
-                                </div>
-                                // --- End Reject Input Section ---
-                              ) : (
-                                // --- Default Approve/Reject Buttons ---
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <button
-                                    onClick={() => handleApprove(booking._id)}
-                                    className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                    disabled={isAnyActionInProgress} // Disable if any action is happening
-                                  >
-                                    {approvingId === booking._id ? (
-                                      <>
-                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Approving...
-                                      </>
-                                    ) : (
-                                      "Approve"
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectClick(booking._id)}
-                                    className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                    disabled={isAnyActionInProgress} // Disable if any action is happening
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                                // --- End Default Buttons ---
+                                )
                               )}
                             </div>
                           )}
@@ -678,7 +760,7 @@ const ManageBookings = () => {
         {/* --- Image Zoom Modal --- */}
         {zoomedImageUrl && (
           <div
-            className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4 animate-fade-in-fast"
+            className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4 animate-fade-in-fast backdrop-blur-sm"
             onClick={() => setZoomedImageUrl(null)} // Close on backdrop click
           >
             <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden">
@@ -709,3 +791,4 @@ const ManageBookings = () => {
 };
 
 export default ManageBookings;
+

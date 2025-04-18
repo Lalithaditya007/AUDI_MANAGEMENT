@@ -19,6 +19,7 @@ const BookingSchema = new mongoose.Schema({
      */
     description: {
         type: String,
+        required: [true, 'Please provide an event description'], // Add required
         trim: true,
         maxlength: [1000, 'Description cannot exceed 1000 characters']
     },

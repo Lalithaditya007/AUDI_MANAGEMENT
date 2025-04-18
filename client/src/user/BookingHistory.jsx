@@ -77,6 +77,23 @@ function BookingHistory() {
     try { const now = new Date(); const minDate = new Date(now.getTime() + (bookingLeadTimeHours || 2) * 36e5); const localMinDt = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000); return localMinDt.toISOString().slice(0, 16); } catch (e) { const now=new Date(); const localNow=new Date(now.getTime()-now.getTimezoneOffset()*60000); return localNow.toISOString().slice(0,16); }
   }, [bookingLeadTimeHours]);
 
+  // Add this function to handle time changes
+  const handleTimeChange = (field, value) => {
+    if (field === 'start') {
+      setModalStartTime(value);
+      // If end time exists and is before new start time, clear it
+      if (modalEndTime && new Date(value) >= new Date(modalEndTime)) {
+        setModalEndTime('');
+      }
+    } else {
+      setModalEndTime(value);
+    }
+    // Reset availability check when times change
+    setIsModalSlotAvailable(true);
+    setModalConflictDetails(null);
+    setModalAvailabilityError('');
+  };
+
   // --- Data Fetching Callbacks ---
   const fetchMyBookings = useCallback(async () => { setIsLoading(true); setError(""); setActionError(""); setActionSuccess(""); const token = localStorage.getItem('authToken'); if (!token) { setError("Auth Error."); setIsLoading(false); return; } const url = `${API_BASE_URL}/api/bookings/mybookings`; console.log("Fetch bookings:", url); try { const res=await fetch(url, {headers: {"Authorization": `Bearer ${token}`, Accept:"json"}}); let data; const ct=res.headers.get('content-type'); if (ct?.includes('json')){data=await res.json();} else {const txt=await res.text(); throw new Error(`Non-JSON(${res.status}): ${txt.slice(0,150)}...`);} if (!res.ok) throw new Error(data.message || `Fetch fail(${res.status})`); if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || "Invalid data."); const p=data.data.map(b => ({...b, id:b._id, department: b.department || {_id:null, name:'N/A'}})); setBookings(p); console.log("Bookings recv:", p.length); } catch (e) { console.error("Fetch err:", e); setError(e.message || "Load err."); setBookings([]); } finally { setIsLoading(false); } }, []);
   const fetchDepartments = useCallback(async () => { setIsLoadingDepartments(true); setDepartmentFetchError(""); const apiUrl = `${API_BASE_URL}/api/departments`; console.log("Fetch depts:", apiUrl); try { const res=await fetch(apiUrl, {headers:{Accept:'json'}}); if (!res.ok) { let m=`Dept fetch fail(${res.status})`; try { const d=await res.json(); m=d.message||m; } catch (e){} throw new Error(m); } const data=await res.json(); if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || "Invalid format."); setDepartments(data.data); } catch (err) { console.error("Fetch depts err:", err); setDepartmentFetchError(err.message || "Load list err."); setDepartments([]); } finally { setIsLoadingDepartments(false); } }, []);
@@ -115,6 +132,23 @@ function BookingHistory() {
      else if (isRescheduleModalOpen) { if(isActive) { setIsModalSlotAvailable(true); setModalConflictDetails(null); setModalAvailabilityError(""); setIsCheckingModalAvailability(false); }}
      return () => {isActive=false;};
   }, [modalStartTime, modalEndTime, rescheduleBooking, isRescheduleModalOpen, debouncedModalCheck]);
+
+  useEffect(() => {
+    if (isRescheduleModalOpen) {
+      console.log('Button disabled conditions:', {
+        notAvailable: !isModalSlotAvailable,
+        checking: isCheckingModalAvailability,
+        submitting: isSubmittingReschedule,
+        noStartTime: !modalStartTime,
+        noEndTime: !modalEndTime,
+        invalidTimeOrder: modalStartTime && modalEndTime && (new Date(modalStartTime) >= new Date(modalEndTime)),
+        unchanged: modalStartTime && modalEndTime && 
+          (formatDateTimeForInput(rescheduleBooking?.startTime) === modalStartTime && 
+           formatDateTimeForInput(rescheduleBooking?.endTime) === modalEndTime)
+      });
+    }
+  }, [isModalSlotAvailable, isCheckingModalAvailability, isSubmittingReschedule, 
+      modalStartTime, modalEndTime, rescheduleBooking]);
 
   useEffect(() => { return () => { /* Cleanup on unmount */ }; }, []);
 
@@ -300,8 +334,8 @@ function BookingHistory() {
                 {/* Original Info Display */}
                 <div className="text-sm p-3 bg-gray-50 rounded border border-gray-200 space-y-1"> <p><strong>Event:</strong> {rescheduleBooking.eventName}</p> <p><strong>Auditorium:</strong> {rescheduleBooking.auditorium?.name ?? 'N/A'}</p> <p className="mt-1"><strong>Current Start:</strong> {rescheduleBooking.startTime ? format(parseISO(rescheduleBooking.startTime), 'Pp') : 'N/A'}</p> <p><strong>Current End:</strong> {rescheduleBooking.endTime ? format(parseISO(rescheduleBooking.endTime), 'p') : 'N/A'}</p> </div>
                 {/* Time Inputs */}
-                <div> <label htmlFor="modalStartTime" className="block text-sm font-medium text-gray-700 mb-1">New Start Time <span className="text-red-500">*</span></label> <input ref={modalStartTimeRef} id="modalStartTime" type="datetime-local" value={modalStartTime} onChange={e=>setModalStartTime(e.target.value)} required disabled={isSubmittingReschedule} min={getMinDateTimeLocalString()} className="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"/> </div>
-                <div> <label htmlFor="modalEndTime" className="block text-sm font-medium text-gray-700 mb-1">New End Time <span className="text-red-500">*</span></label> <input ref={modalEndTimeRef} id="modalEndTime" type="datetime-local" value={modalEndTime} onChange={e=>setModalEndTime(e.target.value)} required disabled={isSubmittingReschedule} min={modalStartTime||getMinDateTimeLocalString()} className="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"/> </div>
+                <div> <label htmlFor="modalStartTime" className="block text-sm font-medium text-gray-700 mb-1">New Start Time <span className="text-red-500">*</span></label> <input ref={modalStartTimeRef} id="modalStartTime" type="datetime-local" value={modalStartTime} onChange={e => handleTimeChange('start', e.target.value)} required disabled={isSubmittingReschedule} min={getMinDateTimeLocalString()} className="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"/> </div>
+                <div> <label htmlFor="modalEndTime" className="block text-sm font-medium text-gray-700 mb-1">New End Time <span className="text-red-500">*</span></label> <input ref={modalEndTimeRef} id="modalEndTime" type="datetime-local" value={modalEndTime} onChange={e => handleTimeChange('end', e.target.value)} required disabled={isSubmittingReschedule} min={modalStartTime||getMinDateTimeLocalString()} className="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"/> </div>
                 {/* --- Availability Feedback Area --- */}
                  <div className="mt-3 mb-1 min-h-[50px] text-sm flex justify-center items-center p-2">
                   {isCheckingModalAvailability && ( <p className="text-gray-500 italic flex items-center animate-pulse"><svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" fill="currentColor"/></svg>Checking...</p> )}
