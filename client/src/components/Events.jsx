@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Simple fallback for when images don't load
 const fallbackGradient = "bg-gradient-to-r from-red-800 to-red-900";
+// API Base URL (needed for API calls, not necessarily image construction anymore)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 const Events = () => {
   const [events, setEvents] = useState([]);
@@ -15,36 +17,36 @@ const Events = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/public/events`;
+        const apiUrl = `${API_BASE_URL}/api/bookings/public/events`; // Use API_BASE_URL here
         console.log('Fetching events from:', apiUrl);
 
         const response = await fetch(apiUrl);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch events: ${response.status}`);
         }
 
         const data = await response.json();
-        
+
         if (data.success && Array.isArray(data.data)) {
           let processedEvents = data.data.map(booking => {
             const startTime = new Date(booking.startTime);
             const endTime = new Date(booking.endTime);
             const status = new Date() >= startTime && new Date() <= endTime ? 'running' : 'upcoming';
-            
-            // Construct proper image URL
+
+            // --- CORRECTED IMAGE URL LOGIC ---
             const imagePath = booking.eventImages?.[0];
-            const imageUrl = imagePath 
-              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${imagePath}`
-              : null;
+            // Use the full URL directly if it starts with http (like Azure URLs)
+            const imageUrl = imagePath && imagePath.startsWith('http') ? imagePath : null;
+            // --- END CORRECTION ---
 
             // Generate an initial random factor for each event (will be updated on image load)
             const initialRandomFactor = Math.floor(Math.random() * 100);
-            
+
             // Assign initial random size class before image loads
             let colSpan = 1;
             let rowSpan = 1;
-            
+
             // Random initial sizing (will be refined when image loads)
             if (initialRandomFactor > 85) {
               colSpan = 2;
@@ -56,7 +58,7 @@ const Events = () => {
               colSpan = 1;
               rowSpan = 2;
             }
-            
+
             return {
               id: booking._id,
               title: booking.eventName,
@@ -64,7 +66,7 @@ const Events = () => {
               date: format(startTime, 'MMM dd, yyyy'),
               time: format(startTime, 'hh:mm a'),
               status,
-              imageUrl,
+              imageUrl, // Use the corrected imageUrl
               randomFactor: initialRandomFactor,
               sizeClass: `col-span-${colSpan} row-span-${rowSpan}`
             };
@@ -72,11 +74,11 @@ const Events = () => {
 
           // Sort events by date (upcoming first)
           processedEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
-          
+
           // Limit to events that will fit in 4 rows (maximum 16 events)
           const maxEvents = Math.min(processedEvents.length, 16);
           processedEvents = processedEvents.slice(0, maxEvents);
-          
+
           console.log(`Processed ${processedEvents.length} events for display with random sizing`);
           setEvents(processedEvents);
         } else {
@@ -92,7 +94,7 @@ const Events = () => {
 
     fetchEvents();
   }, []);
-  
+
   // Extract image dimensions and determine appropriate grid size with randomization
   const handleImageLoad = (event, id, img) => {
     try {
@@ -100,25 +102,25 @@ const Events = () => {
       const width = img.naturalWidth;
       const height = img.naturalHeight;
       const aspectRatio = width / height;
-      
+
       // Find the current event
       const currentEvent = events.find(e => e.id === id);
       if (!currentEvent) return;
-      
+
       console.log(`Image dimensions for "${currentEvent.title}": ${width}x${height}, ratio: ${aspectRatio.toFixed(2)}`);
-      
+
       // Use the event's existing random factor or generate a new one
       const randomFactor = currentEvent.randomFactor || Math.floor(Math.random() * 100);
-      
+
       // Determine box size based on both image dimensions AND randomization
       let colSpan = 1;
       let rowSpan = 1;
-      
+
       // Wide landscape images (panoramic, banners, etc.)
       if (aspectRatio > 1.8 || (aspectRatio > 1.5 && randomFactor > 70)) {
         colSpan = 2;
         rowSpan = 1;
-      } 
+      }
       // Very wide images
       else if (aspectRatio > 1.4 || (aspectRatio > 1.2 && randomFactor > 80)) {
         colSpan = 2;
@@ -157,28 +159,28 @@ const Events = () => {
         }
         // else standard 1x1 cell
       }
-      
+
       // Ensure we don't exceed grid bounds
       colSpan = Math.min(colSpan, 2);
       rowSpan = Math.min(rowSpan, 2);
-      
+
       const sizeClass = `col-span-${colSpan} row-span-${rowSpan}`;
-      
+
       console.log(`Assigned grid size for "${currentEvent.title}": ${colSpan}×${rowSpan} with random factor ${randomFactor}`);
-      
+
       // Update the event with the appropriate size class based on image dimensions + randomization
-      setEvents(prevEvents => 
-        prevEvents.map(e => 
+      setEvents(prevEvents =>
+        prevEvents.map(e =>
           e.id === id ? {
-            ...e, 
-            sizeClass, 
+            ...e,
+            sizeClass,
             aspectRatio,
             imageDimensions: { width, height },
             randomFactor
           } : e
         )
       );
-      
+
       // Mark image as loaded
       setImageLoaded(prev => ({...prev, [id]: true}));
     } catch (err) {
@@ -217,7 +219,7 @@ const Events = () => {
   if (events.length === 0) {
     return (
       <div className="h-[720px] flex items-center justify-center">
-        <p className="text-gray-500">No upcoming events</p>
+        <p className="text-gray-500">No current or upcoming events</p>
       </div>
     );
   }
@@ -241,7 +243,7 @@ const Events = () => {
               {event.imageUrl ? (
                 <div className="relative w-full h-full">
                   <img
-                    src={event.imageUrl}
+                    src={event.imageUrl} // Use the corrected imageUrl
                     alt={event.title}
                     className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105 p-1"
                     onLoad={(e) => handleImageLoad(e, event.id, e.target)}

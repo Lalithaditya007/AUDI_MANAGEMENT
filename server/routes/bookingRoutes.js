@@ -1,17 +1,10 @@
 // server/routes/bookingRoutes.js
 const express = require('express');
-const path = require('path');
+const path = require('path'); // Path is still potentially useful, keep it for now
 const multer = require('multer');
-const fs = require('fs');
+// Removed fs requirement as we don't create local dirs anymore
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log('Created uploads directory at:', uploadsDir);
-}
-
-// Import controller functions - ADD checkAvailability here
+// Import controller functions - Ensure all required functions are listed
 const {
     createBooking,
     getMyBookings,
@@ -19,15 +12,16 @@ const {
     approveBooking,
     rejectBooking,
     getBookingStats,
-    withdrawBooking, // Renamed from withdrawBooking as per controller - CHECK YOUR HISTORY FILE FOR THIS
-    requestReschedule, // Renamed from requestReschedule - CHECK YOUR HISTORY FILE FOR THIS
+    withdrawBooking,
+    requestReschedule,
     getAuditoriumSchedule,
     getRecentPendingBookings,
     getUpcomingBookings,
     getBookingTrends,
     getAuditoriumAvailability,
     getPublicEvents,
-    checkAvailability // <-- IMPORT THE NEW FUNCTION
+    checkAvailability,
+    checkBookingConflicts // Assuming you added this controller function based on previous context
 } = require('../controllers/bookingController'); // Verify this path is correct
 
 // Import middleware
@@ -36,34 +30,26 @@ const { protect, admin } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // --- Multer Config ---
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadsDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-        const userId = req.user?._id || 'guest'; // Add safety check for user ID
-        const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
-        const filename = `event-${userId}-${uniqueSuffix}-${safeFilename}`;
-        cb(null, filename);
-    }
-});
+// Change to memoryStorage to handle file buffer in memory
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
+    // Keep the file type filter
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
     if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only JPEG, PNG and GIF allowed.'), false);
+        // Use a more specific error message for the global error handler
+        cb(new Error('Invalid file type. Only JPEG, PNG, and GIF allowed.'), false);
     }
 };
 
 const upload = multer({
-    storage: storage,
+    storage: storage, // Use memoryStorage
     fileFilter: fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 1
+        fileSize: 5 * 1024 * 1024, // 5MB limit (keep the limit)
+        files: 1 // Still limit to one file
     }
 });
 
@@ -73,25 +59,27 @@ const upload = multer({
 // GET /api/bookings/public/events (Public)
 router.get('/public/events', getPublicEvents);
 
-// POST /api/bookings/ (Create Booking - User)
+// POST /api/bookings/ (Create Booking - User, uses multer)
 router.route('/')
-    .post(protect, upload.single('eventPoster'), createBooking);
+    .post(protect, upload.single('eventPoster'), createBooking); // 'eventPoster' is the field name in the form
 
 // GET /api/bookings/mybookings (Get User's Bookings - User)
 router.route('/mybookings')
     .get(protect, getMyBookings);
 
-// --- NEW ROUTE FOR AVAILABILITY CHECK ---
-// GET /api/bookings/check-availability?auditoriumId=...&startTime=...&endTime=... (Check Slot - User)
+// GET /api/bookings/check-availability (Check Slot - User)
 router.route('/check-availability')
-    .get(protect, checkAvailability); // <--- ADDED ROUTE MAPPING
+    .get(protect, checkAvailability);
 
-// GET /api/bookings/availability/:auditoriumId?year=...&month=... (Get monthly slots - User)
+// POST /api/bookings/conflicts (Check Conflicts via POST - User)
+router.post('/conflicts', protect, checkBookingConflicts); // Assuming this controller exists
+
+// GET /api/bookings/availability/:auditoriumId (Get monthly slots - User)
 router.route('/availability/:auditoriumId')
     .get(protect, getAuditoriumAvailability);
 
 
-// Admin Routes - Prefixed logically for clarity
+// --- Admin Routes ---
 
 // GET /api/bookings/admin/all (Get All Bookings - Admin)
 router.route('/admin/all')
@@ -114,27 +102,28 @@ router.route('/admin/trends')
     .get(protect, admin, getBookingTrends);
 
 
-// Specific booking actions by ID (User and Admin have different permissions)
+// --- Specific Booking Actions by ID ---
 
-// DELETE /api/bookings/:id (Withdraw - User, based on logic in controller)
-// PUT /api/bookings/:id (Request Reschedule - User, based on logic in controller)
+// DELETE /api/bookings/:id (Withdraw - User)
+// PUT /api/bookings/:id/reschedule (Request Reschedule - User) - Changed from PUT /:id based on previous structure
 router.route('/:id')
-    .delete(protect, withdrawBooking)   // User withdraws their own booking
-    .put(protect, requestReschedule);   // User requests reschedule for their own booking
+    .delete(protect, withdrawBooking);
 
+router.route('/:id/reschedule') // Separate route for reschedule PUT request
+    .put(protect, requestReschedule);
 
-// GET /api/bookings/schedule/:auditoriumId (Admin Schedule Viewer for specific auditorium)
-router.route('/schedule/:auditoriumId') // Separate from the user availability endpoint
+// GET /api/bookings/schedule/:auditoriumId (Admin Schedule Viewer)
+router.route('/schedule/:auditoriumId')
     .get(protect, admin, getAuditoriumSchedule);
 
 
-// PATCH (or PUT) for Admin Approve/Reject actions on specific bookings by ID
-// Using PUT based on your original controller naming convention, though PATCH is arguably more semantically correct for updates.
-// PATCH /api/bookings/:id/approve (Approve - Admin) - Using PUT to match controller file for now
+// --- Admin Approve/Reject Actions ---
+
+// PUT /api/bookings/:id/approve (Approve - Admin)
 router.route('/:id/approve')
     .put(protect, admin, approveBooking);
 
-// PATCH /api/bookings/:id/reject (Reject - Admin) - Using PUT to match controller file for now
+// PUT /api/bookings/:id/reject (Reject - Admin)
 router.route('/:id/reject')
     .put(protect, admin, rejectBooking);
 
