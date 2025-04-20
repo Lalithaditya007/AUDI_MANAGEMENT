@@ -5,6 +5,7 @@ import ksaudi from '../assets/ksaudi/ksaudi1.jpg';
 import bblock from '../assets/bblock/bblock1.jpg';
 import PEB from '../assets/peb/peb1.jpg';
 import  {motion} from 'framer-motion';
+import { Link } from 'react-router-dom';
 
 const HomePage = () => {
   return (
@@ -40,22 +41,22 @@ const HomePage = () => {
             
             {/* CTA Buttons */}
             <div className="flex flex-wrap gap-4 justify-center mt-8">
-              <motion.a
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                href="/auditoriums"
-                className="px-8 py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-300"
-              >
-                Explore Auditoriums
-              </motion.a>
-              <motion.a
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                href="/login"
-                className="px-8 py-3 bg-white/10 backdrop-blur-sm text-white rounded-full font-semibold hover:bg-white/20 transition-colors duration-300 border border-white/30"
-              >
-                Book Now
-              </motion.a>
+              <motion.div>
+                <Link
+                  to="/auditoriums"
+                  className="px-8 py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-300"
+                >
+                  Explore Auditoriums
+                </Link>
+              </motion.div>
+              <motion.div>
+                <Link
+                  to="/login"
+                  className="px-8 py-3 bg-white/10 backdrop-blur-sm text-white rounded-full font-semibold hover:bg-white/20 transition-colors duration-300 border border-white/30"
+                >
+                  Book Now
+                </Link>
+              </motion.div>
             </div>
           </motion.div>
         </div>
