@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"; // Added useLocation here just in case needed for state pass-through in future
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Auditoriums from "./pages/Audis/Auditoriums";
 import KSAudi from "./pages/Audis/KSAudi";
@@ -12,12 +12,11 @@ import ManageBookings from "./admin/ManageBookings";
 import BookingHistory from "./user/BookingHistory";
 import APJAuditorium from "./pages/Audis/APJAudi.jsx";
 import PEBHall from "./pages/Audis/PEBHall.jsx";
-import AdminScheduleViewer from "./admin/AdminScheduleViewer"; 
+import AdminScheduleViewer from "./admin/AdminScheduleViewer";
 import Footer from "./components/Footer";
 
 
 function AppContent() {
-    // Needed to use useLocation inside App for state passing
     const location = useLocation();
 
     const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('authToken'));
@@ -32,36 +31,38 @@ function AppContent() {
             <main className="flex-grow">
                 <Routes>
                     {/* Public Routes */}
-                    <Route path="/" element={<Homepage />} /> 
-                    <Route path="/auditoriums" element={<Auditoriums />} /> 
-                    <Route path="/ks-auditorium" element={<KSAudi />} /> 
+                    {/* --- MODIFIED LINE BELOW --- */}
+                    <Route path="/" element={<Homepage isLoggedIn={isLoggedIn} userRole={userRole} />} />
+                    {/* --- END MODIFICATION --- */}
+                    <Route path="/auditoriums" element={<Auditoriums />} />
+                    <Route path="/ks-auditorium" element={<KSAudi />} />
                     <Route path="/b-block-seminar-hall" element={<BBlockSeminarHall />} />
                     <Route path="/auditoriums/b-block" element={<BBlockSeminarHall />} />
-                    <Route path="/peb-hall" element={<PEBHall />} /> 
+                    <Route path="/peb-hall" element={<PEBHall />} />
                     <Route path="/apj-auditorium" element={<APJAuditorium />} />
 
                     {/* Login Route - Modified */}
                     <Route path="/login" element={
                         isLoggedIn ? (
-                            userRole === "admin" ? 
-                                <Navigate to="/admin-dashboard"/> : 
-                                <Navigate to="/"/>
+                            userRole === "admin" ?
+                                <Navigate to="/admin-dashboard"/> :
+                                <Navigate to="/"/> // Redirect logged-in users away from login
                         ) : (
-                            <Login 
-                                setIsLoggedIn={setIsLoggedIn} 
-                                setUserRole={setUserRole} 
+                            <Login
+                                setIsLoggedIn={setIsLoggedIn}
+                                setUserRole={setUserRole}
                                 setUserEmail={setUserEmail}
                             />
                         )
                     } />
 
-                    {/* Rest of your routes remain the same */}
+                    {/* Redirect admin-login to prevent direct access */}
                     <Route path="/admin-login" element={<Navigate to="/login" replace />} />
-                    
+
                     {/* User Routes */}
                     <Route path="/book-auditorium" element={isLoggedIn&&userRole==='user'?<BookAuditorium userEmail={userEmail}/>:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/booking-history" element={isLoggedIn&&userRole==='user'?<BookingHistory />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
-                    
+
                     {/* Admin Routes */}
                     <Route path="/admin-dashboard" element={isLoggedIn&&userRole==='admin'?<AdminDashboard />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/manage-bookings" element={isLoggedIn&&userRole==='admin'?<ManageBookings />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
