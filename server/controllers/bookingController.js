@@ -209,3 +209,42 @@ exports.checkBookingConflicts = async (req, res) => {
     // ... (keep existing implementation) ...
      console.log(`POST /api/bookings/conflicts requested`); try { const { auditoriumId, startTime, endTime, excludeBookingId } = req.body; if (!auditoriumId || !startTime || !endTime) { return res.status(400).json({ success: false, message: 'Auditorium ID, startTime, and endTime are required in the request body.' }); } if (!mongoose.Types.ObjectId.isValid(auditoriumId)) { return res.status(400).json({ success: false, message: 'Invalid Auditorium ID format.' }); } const startDt = DateTime.fromISO(startTime, { setZone: true }); const endDt = DateTime.fromISO(endTime, { setZone: true }); if (!startDt.isValid || !endDt.isValid) { return res.status(400).json({ success: false, message: 'Invalid startTime or endTime format. Use ISO 8601 format.' }); } if (startDt >= endDt) { return res.status(400).json({ success: false, message: 'End time must be strictly after start time.' }); } const startUTC = startDt.toJSDate(); const endUTC = endDt.toJSDate(); const conflictQuery = { auditorium: auditoriumId, status: 'approved', startTime: { $lt: endUTC }, endTime: { $gt: startUTC } }; if (excludeBookingId && mongoose.Types.ObjectId.isValid(excludeBookingId)) { conflictQuery._id = { $ne: new mongoose.Types.ObjectId(excludeBookingId) }; } const conflict = await Booking.findOne(conflictQuery).populate('auditorium', 'name').select('eventName startTime endTime auditorium'); if (conflict) { return res.status(200).json({ success: true, hasConflict: true, message: `Conflicts with: '${conflict.eventName}' in ${conflict.auditorium?.name || 'N/A'} from ${formatDateTimeIST(conflict.startTime)} to ${formatDateTimeIST(conflict.endTime)}.`, conflictingBooking: { eventName: conflict.eventName, startTime: conflict.startTime, endTime: conflict.endTime, auditoriumName: conflict.auditorium?.name || 'N/A' } }); } return res.status(200).json({ success: true, hasConflict: false, message: 'The selected time slot appears to be available.' }); } catch (error) { console.error('[Error] Check booking conflicts via POST failed:', error); res.status(500).json({ success: false, message: 'Server error checking booking conflicts.' }); }
 };
+/**
+ * @desc    Get Pending bookings starting within the next 2 days (Admin Action Required View)
+ * @route   GET /api/bookings/admin/pending-upcoming
+ * @access  Private/Admin
+ */
+exports.getPendingUpcomingBookings = async (req, res, next) => {
+    console.log(`[Admin] Fetching pending bookings requiring action (next 2 days)...`);
+    try {
+        // Calculate time range: Now (UTC) to End of Day 2 days from now (UTC)
+        const now = DateTime.now(); // Server's current time
+        const startQueryUTC = now.toUTC().toJSDate(); // From now
+        const endQueryUTC = now.plus({ days: 2 }).endOf('day').toUTC().toJSDate(); // To end of the day, 2 days from now
+
+        console.log(`[Admin Action Required Query] Time window (UTC): ${startQueryUTC.toISOString()} to ${endQueryUTC.toISOString()}`);
+
+        const upcomingPending = await Booking.find({
+            status: 'pending',
+            startTime: {
+                $gte: startQueryUTC, // Starting now or later
+                $lt: endQueryUTC     // Starting before the end of the target day
+            }
+        })
+        .sort({ startTime: 1 }) // Show earliest first
+        .populate('user', 'username email')
+        .populate('auditorium', 'name')
+        .populate('department', 'name code');
+
+        console.log(`[Admin Action Required Query] Found ${upcomingPending.length} bookings.`);
+
+        res.status(200).json({
+            success: true,
+            count: upcomingPending.length,
+            data: upcomingPending
+        });
+    } catch (error) {
+        console.error("[Error] Fetching pending upcoming bookings failed:", error);
+        res.status(500).json({ success: false, message: 'Server error retrieving pending upcoming bookings.' });
+    }
+};

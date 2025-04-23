@@ -21,7 +21,8 @@ const {
     getAuditoriumAvailability,
     getPublicEvents,
     checkAvailability,
-    checkBookingConflicts // Assuming you added this controller function based on previous context
+    checkBookingConflicts, // Assuming you added this controller function based on previous context
+    getPendingUpcomingBookings
 } = require('../controllers/bookingController'); // Verify this path is correct
 
 // Import middleware
@@ -100,6 +101,10 @@ router.route('/admin/upcoming')
 // GET /api/bookings/admin/trends (Get Booking Trends - Admin)
 router.route('/admin/trends')
     .get(protect, admin, getBookingTrends);
+
+// GET /api/bookings/admin/pending-upcoming (Get Pending Bookings Needing Action - Admin)
+router.route('/admin/pending-upcoming')
+    .get(protect, admin, getPendingUpcomingBookings);
 
 
 // --- Specific Booking Actions by ID ---
