@@ -1,12 +1,12 @@
-# profile section 
+# profile section
 
 # admin should be notified if the event request is in pending when no time left (5 days left ) // pop up on home page 
 
-# events should be booked only two months prior from current date 
+# events should be booked only two months prior from current date -done 
 
 # updating auditoriums list  , pages should not be static 
 
-# user management by admin 
+# user management by admin --done
 
 # admin should be holding autority to cancel the event even if the event is running right now (such as traiings)
 

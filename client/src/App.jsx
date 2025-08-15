@@ -7,8 +7,9 @@ import Homepage from "./pages/Homepage";
 import Login from "./pages/Login";
 import BBlockSeminarHall from "./pages/Audis/BBlock";
 import BookAuditorium from "./user/BookAuditorium";
-import AdminDashboard from "./admin/Admindashboard";
+import AdminDashboard from "./admin/AdminDashboard";
 import ManageBookings from "./admin/ManageBookings";
+import CreateUser from "./admin/CreateUser";
 import BookingHistory from "./user/BookingHistory";
 import APJAuditorium from "./pages/Audis/APJAudi.jsx";
 import PEBHall from "./pages/Audis/PEBHall.jsx";
@@ -66,6 +67,7 @@ function AppContent() {
                     {/* Admin Routes */}
                     <Route path="/admin-dashboard" element={isLoggedIn&&userRole==='admin'?<AdminDashboard />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/manage-bookings" element={isLoggedIn&&userRole==='admin'?<ManageBookings />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+                    <Route path="/admin/create-user" element={isLoggedIn&&userRole==='admin'?<CreateUser />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/schedule-viewer" element={isLoggedIn&&userRole==='admin'?<AdminScheduleViewer />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
 
                     <Route path="*" element={<div className="p-10 text-center"><h2>404 Not Found</h2></div>} />

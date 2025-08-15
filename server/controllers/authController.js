@@ -212,3 +212,110 @@ exports.loginAdminSpecific = async (req, res, next) => {
         }
     }
 };
+
+// --- Admin Create User (Admin Only) ---
+exports.adminCreateUser = async (req, res, next) => {
+    const { username, email, password, role, departmentId } = req.body;
+    console.log("Admin attempting to create user:", username, "with role:", role);
+
+    // Basic input validation
+    if (!username || !email || !password) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Please provide username, email, and password' 
+        });
+    }
+
+    // Validate role
+    if (role && !['user', 'admin'].includes(role)) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Invalid role. Must be either "user" or "admin"' 
+        });
+    }
+
+    try {
+        // Check if user already exists (case-insensitive email)
+        let existingUser = await User.findOne({
+            $or: [
+                { email: email.toLowerCase() },
+                { username: username }
+            ]
+        });
+
+        if (existingUser) {
+            let message = 'User already exists with this ';
+            if (existingUser.email === email.toLowerCase() && existingUser.username === username) {
+                message += 'email and username.';
+            } else if (existingUser.email === email.toLowerCase()) {
+                message += 'email.';
+            } else {
+                message += 'username.';
+            }
+            return res.status(400).json({ success: false, message: message });
+        }
+
+        // Prepare user data
+        const userData = {
+            username,
+            email, // Schema handles lowercase
+            password, // Schema pre-save hook handles hashing
+            role: role || 'user' // Default to 'user' if not specified
+        };
+
+        // If departmentId is provided, validate it exists (optional feature)
+        if (departmentId) {
+            const department = await Department.findById(departmentId);
+            if (!department) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid department selected' 
+                });
+            }
+            // Note: We're not storing departmentId in User model as it's not in the schema
+            // This is just for validation. If you want to store it, you'd need to update the User schema
+        }
+
+        // Create new user
+        const newUser = await User.create(userData);
+
+        // Don't send password back, even hashed
+        const userResponse = {
+            _id: newUser._id,
+            username: newUser.username,
+            email: newUser.email,
+            role: newUser.role,
+            createdAt: newUser.createdAt
+        };
+
+        console.log(`Admin successfully created ${newUser.role}: ${newUser.username} (ID: ${newUser._id})`);
+
+        // Respond with success and user info (no token needed since admin is creating for someone else)
+        res.status(201).json({
+            success: true,
+            message: `${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} created successfully.`,
+            user: userResponse
+        });
+
+    } catch (error) {
+        console.error("[Error] Admin user creation failed:", error);
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ 
+                success: false, 
+                message: `Validation Error: ${messages.join(', ')}` 
+            });
+        }
+        if (error.code === 11000) { // Duplicate key error
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Email or username is already taken.' 
+            });
+        }
+        // Generic server error
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error during user creation.' 
+        });
+    }
+};
