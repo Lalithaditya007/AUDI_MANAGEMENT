@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+  import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
 import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
@@ -6,6 +6,7 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
+import AddAuditorium from '../pages/Audis/AddAuditorium';
 
 // --- Helper Components (Keep existing StatsCard, TrendChart) ---
 function StatsCard({ title, value, color = "text-gray-900" }) { /* ... existing code ... */ 
@@ -203,6 +204,14 @@ const AdminDashboard = () => {
             </svg>
             View Schedule
           </Link>
+          <div className="flex justify-end mb-6">
+            <button
+              className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+              onClick={() => navigate('/admin/add-auditorium')}
+            >
+              Add New Auditorium
+            </button>
+          </div>
         </div>
 
         {/* Initial Loading Indicator */}

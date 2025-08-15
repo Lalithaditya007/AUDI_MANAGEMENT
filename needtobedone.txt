@@ -4,7 +4,7 @@
 
 # events should be booked only two months prior from current date -done 
 
-# updating auditoriums list  , pages should not be static 
+# updating auditoriums list  , pages should not be static -done
 
 # user management by admin --done
 

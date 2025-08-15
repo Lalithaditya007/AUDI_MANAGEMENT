@@ -15,6 +15,8 @@ import APJAuditorium from "./pages/Audis/APJAudi.jsx";
 import PEBHall from "./pages/Audis/PEBHall.jsx";
 import AdminScheduleViewer from "./admin/AdminScheduleViewer";
 import Footer from "./components/Footer";
+import AuditoriumDetails from "./pages/Audis/AuditoriumDetails";
+import AddAuditorium from "./pages/Audis/AddAuditorium";
 
 
 function AppContent() {
@@ -36,6 +38,7 @@ function AppContent() {
                     <Route path="/" element={<Homepage isLoggedIn={isLoggedIn} userRole={userRole} />} />
                     {/* --- END MODIFICATION --- */}
                     <Route path="/auditoriums" element={<Auditoriums />} />
+                    <Route path="/auditorium/:id" element={<AuditoriumDetails />} />
                     <Route path="/ks-auditorium" element={<KSAudi />} />
                     <Route path="/b-block-seminar-hall" element={<BBlockSeminarHall />} />
                     <Route path="/auditoriums/b-block" element={<BBlockSeminarHall />} />
@@ -69,6 +72,7 @@ function AppContent() {
                     <Route path="/manage-bookings" element={isLoggedIn&&userRole==='admin'?<ManageBookings />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/create-user" element={isLoggedIn&&userRole==='admin'?<CreateUser />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/schedule-viewer" element={isLoggedIn&&userRole==='admin'?<AdminScheduleViewer />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+                    <Route path="/admin/add-auditorium" element={isLoggedIn&&userRole==='admin'?<AddAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
 
                     <Route path="*" element={<div className="p-10 text-center"><h2>404 Not Found</h2></div>} />
                 </Routes>

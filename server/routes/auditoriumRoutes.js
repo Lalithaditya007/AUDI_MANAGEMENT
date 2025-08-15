@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 const {
     createAuditorium,
     getAllAuditoriums,
@@ -11,7 +13,7 @@ const { protect, admin } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.route('/')
-    .post(protect, admin, createAuditorium) 
+    .post(protect, admin, upload.single('image'), createAuditorium) 
     .get(getAllAuditoriums);
 
 router.route('/:id')

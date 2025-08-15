@@ -8,12 +8,40 @@ const { DateTime } = require('luxon'); // Assuming you use Luxon for date handli
 const istTimezone = 'Asia/Kolkata';
 
 exports.createAuditorium = async (req, res, next) => {
-  const { name, capacity, location, description, amenities, imageUrl } = req.body;
+  // Support both JSON and multipart form data
+  const body = req.body || {};
+  const name = body.name;
+  const capacity = body.capacity;
+  const location = body.location;
+  const description = body.description;
+  // Fix amenities extraction for multipart form data
+  let amenities = [];
+  if (Array.isArray(body.amenities)) {
+    amenities = body.amenities.flat().map(a => a.trim()).filter(Boolean);
+  } else if (typeof body.amenities === 'string') {
+    amenities = body.amenities.split(',').map(a => a.trim()).filter(Boolean);
+  }
+  const available = body.available !== undefined ? body.available : true;
+  const contactInfo = body.contactInfo;
+  // Fix size extraction for multipart form data
+  let size = body.size;
+  if (Array.isArray(size)) {
+    size = size.find(s => typeof s === 'string' && s.length > 0) || '';
+  }
+  const createdBy = body.createdBy;
+  const customFields = body.customFields;
+  let images = [];
+  if (req.file) {
+    images.push(`/uploads/${req.file.filename}`);
+  } else if (body.images) {
+    // fallback for JSON
+    images = Array.isArray(body.images) ? body.images : [body.images];
+  }
 
-  if (!name || !capacity || !location) {
+  if (!name || !capacity || !location || !size) {
     return res.status(400).json({
       success: false,
-      message: 'Please provide auditorium name, capacity, and location',
+      message: 'Please provide auditorium name, capacity, location, and size',
     });
   }
 
@@ -30,9 +58,14 @@ exports.createAuditorium = async (req, res, next) => {
       name,
       capacity,
       location,
-      description, // optional
-      amenities,   // optional
-      imageUrl,    // optional
+      description,
+      amenities,
+      images,
+      available,
+      createdBy,
+      contactInfo,
+      customFields,
+      size
     });
 
     res.status(201).json({
@@ -110,6 +143,15 @@ exports.getAuditoriumById = async (req, res, next) => {
 exports.updateAuditorium = async (req, res, next) => {
   const auditoriumId = req.params.id;
   const updateData = req.body;
+  // Only allow fields defined in schema
+  const allowedFields = [
+    'name', 'capacity', 'location', 'description', 'amenities', 'images', 'available', 'createdBy', 'contactInfo', 'customFields', 'size'
+  ];
+  Object.keys(updateData).forEach(key => {
+    if (!allowedFields.includes(key)) {
+      delete updateData[key];
+    }
+  });
 
   // Validate ID format
   if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {
