@@ -23,6 +23,6 @@ router.route('/')
 
 router.route('/:id')
     .get(getAuditoriumById)
-    .put(protect, admin, updateAuditorium) 
-    .delete(protect, admin, deleteAuditorium); 
+    .put(protect, admin, setAuditoriumUploadType, upload.single('image'), updateAuditorium)
+    .delete(protect, admin, deleteAuditorium);
 module.exports = router;
