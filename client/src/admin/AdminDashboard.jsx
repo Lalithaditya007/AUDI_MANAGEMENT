@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
-import {  AnimatePresence } from "framer-motion"; // Added AnimatePresence
+import {  AnimatePresence,motion} from "framer-motion"; // Added AnimatePresence
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -171,7 +171,7 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-900">
+  <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-900 mt-20">
           Admin Dashboard
         </h1>
 

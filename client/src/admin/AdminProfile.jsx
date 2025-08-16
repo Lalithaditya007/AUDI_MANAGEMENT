@@ -75,7 +75,7 @@ const AdminProfile = () => {
       <div className="container mx-auto px-4 flex flex-col items-center">
         {/* Page Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Profile</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 mt-20">Admin Profile</h1>
           <p className="text-gray-600">Manage your administrative account settings</p>
         </div>
 

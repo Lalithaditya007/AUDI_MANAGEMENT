@@ -3,7 +3,7 @@ import Events from '../components/Events.jsx';
 import clg from '../assets/clg.jpg';
 import ksaudi from '../assets/ksaudi/ksaudi1.jpg'; // A fallback image
 // Note: The other images 'bblock' and 'PEB' are not used in this dynamic version, which is fine.
-// import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 // The 'Link' component from 'react-router-dom' was imported but not used. It's good practice to remove unused imports, but it's not an error.
 
 // This component fetches and displays the first 3 auditoriums from your API
@@ -115,9 +115,7 @@ const HomePage = ({ isLoggedIn, userRole }) => {
                 >
                   Explore Auditoriums
                 </motion.a>
-                <div className="mt-2 animate-bounce">
-                  <svg className="w-6 h-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-                </div>
+                {/* ...existing code... */}
               </div>
               {/* Conditional "Book Now" Button */}
               {!(isLoggedIn && userRole === 'admin') && (
@@ -133,6 +131,10 @@ const HomePage = ({ isLoggedIn, userRole }) => {
             </div>
           </div>
           {/* Arrow moved below button above */}
+          {/* Fixed arrow at bottom, 50px up */}
+          <div className="fixed left-1/2 transform -translate-x-1/2 bottom-[50px] z-50 animate-bounce">
+            <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+          </div>
         </div>
       </header>
 

@@ -104,16 +104,16 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
                                                 Dashboard
                                             </NavLink>
                                         </li>
-                                        <li>
+                                        {/* <li>
                                             <NavLink to="/manage-bookings" className={getNavLinkClass}>
                                                 Manage
                                             </NavLink>
-                                        </li>
-                                        <li>
+                                        </li> */}
+                                        {/* <li>
                                             <NavLink to="/admin/schedule-viewer" className={getNavLinkClass}>
                                                 Schedule
                                             </NavLink>
-                                        </li>
+                                        </li> */}
                                         <li>
                                             <NavLink to="/admin/profile" className={getNavLinkClass}>
                                                 Profile
