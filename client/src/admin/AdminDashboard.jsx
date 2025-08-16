@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
-import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
+import {  AnimatePresence } from "framer-motion"; // Added AnimatePresence
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -61,7 +61,7 @@ const AdminDashboard = () => {
 
   // --- API Fetching Helper (No changes needed) ---
   const fetchData = useCallback(async (url, token, signal) => { /* ... existing code ... */ 
-    console.log(`[API Call] Fetching from ${url}`); try { const response = await fetch(url, { signal, headers: { Authorization: `Bearer ${token}`, Accept: "application/json", }, }); let data; const contentType = response.headers.get("content-type"); if (contentType?.includes("application/json")) { data = await response.json(); } else { const text = await response.text(); if (!response.ok) { throw new Error(`Server Error ${response.status}: ${text.substring(0, 150)}...`); } else { console.warn(`[API Warning] Received non-JSON success response from ${url}`); return null; } } if (!response.ok) { throw new Error(data.message || `Fetch failed: ${response.status}`); } if (data.success && data.hasOwnProperty('data')) { console.log(`[API Response] Success from ${url}`); return data.data; } else { throw new Error(data.message || "Invalid data structure received."); } } catch (error) { if (error.name === 'AbortError') { console.log('Fetch aborted:', url); return undefined; } else { console.error(`[Fetch Error] from ${url}:`, error); throw error; } }
+  console.log(`[API Call] Fetching from ${url}`); try { const response = await fetch(url, { signal, headers: { Authorization: `Bearer ${token}`, Accept: "application/json", }, }); let data; const contentType = response.headers.get("content-type"); if (contentType?.includes("application/json")) { data = await response.json(); } else { const text = await response.text(); if (!response.ok) { throw new Error(`Server Error ${response.status}: ${text.substring(0, 150)}...`); } else { console.warn(`[API Warning] Received non-JSON success response from ${url}`); return null; } } if (!response.ok) { throw new Error(data.message || `Fetch failed: ${response.status}`); } if (data.success && Object.prototype.hasOwnProperty.call(data, 'data')) { console.log(`[API Response] Success from ${url}`); return data.data; } else { throw new Error(data.message || "Invalid data structure received."); } } catch (error) { if (error.name === 'AbortError') { console.log('Fetch aborted:', url); return undefined; } else { console.error(`[Fetch Error] from ${url}:`, error); throw error; } }
   }, []);
 
   // --- UseEffect Hooks for Data Fetching ---

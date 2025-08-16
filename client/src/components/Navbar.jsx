@@ -5,7 +5,7 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
     const location = useLocation();
     const navigate = useNavigate();
     const isLoginPage = location.pathname.toLowerCase() === '/login';
-    const isHomePage = location.pathname === '/'; // Check if the current page is the home page
+    // const isHomePage = location.pathname === '/'; // Check if the current page is the home page
 
     const handleLogout = () => {
         localStorage.removeItem('authToken');
@@ -134,8 +134,7 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
                     </ul>
                 </div>
             </nav>
-            {/* This div adds padding to prevent content from hiding behind the fixed navbar */}
-            <div className="h-24 sm:h-28"></div>
+            {/* Removed spacer to eliminate gap between navbar and next section */}
         </>
     );
 };
