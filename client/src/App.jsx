@@ -1,3 +1,5 @@
+import EditAuditorium from "./admin/EditAuditorium";
+import ManageAuditoriums from "./admin/ManageAuditoriums";
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
@@ -76,6 +78,8 @@ function AppContent() {
                     <Route path="/admin/create-user" element={isLoggedIn&&userRole==='admin'?<CreateUser />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/schedule-viewer" element={isLoggedIn&&userRole==='admin'?<AdminScheduleViewer />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/add-auditorium" element={isLoggedIn&&userRole==='admin'?<AddAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+                    <Route path="/admin/manage-auditoriums" element={isLoggedIn&&userRole==='admin'?<ManageAuditoriums />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+                    <Route path="/admin/auditoriums/:id" element={isLoggedIn&&userRole==='admin'?<EditAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/profile" element={isLoggedIn&&userRole==='admin'?<AdminProfile />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
 
                     <Route path="*" element={<div className="p-10 text-center"><h2>404 Not Found</h2></div>} />

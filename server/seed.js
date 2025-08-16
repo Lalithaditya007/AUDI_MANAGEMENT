@@ -168,7 +168,9 @@ const sampleAuditoriums = [
         location: "Main Block, Ground Floor",
         description: "A large auditorium equipped with state-of-the-art sound and lighting systems. Perfect for conferences, cultural events, and large gatherings.",
         amenities: ["Projector", "Sound System", "Air Conditioning", "Stage Lighting"],
-        images: ["/assets/ksaudi/ksaudi1.jpg", "/assets/ksaudi/ksaudi2.jpg"],
+        images: [
+            "/uploads/auditorium/ksaudi1.jpg"
+        ],
         available: true,
         contactInfo: "ksadmin@college.edu",
         size: "large"
@@ -179,7 +181,9 @@ const sampleAuditoriums = [
         location: "B Block, First Floor",
         description: "A spacious seminar hall for academic talks and presentations. Ideal for workshops, training sessions, and department meetings.",
         amenities: ["Projector", "Whiteboard", "Air Conditioning"],
-        images: ["/assets/bblock/bblock1.jpg", "/assets/bblock/bblock2.jpg"],
+        images: [
+            "/uploads/auditorium/bblock1.jpg"
+        ],
         available: true,
         contactInfo: "bblock@college.edu",
         size: "medium"
@@ -190,7 +194,9 @@ const sampleAuditoriums = [
         location: "APJ Block, Second Floor",
         description: "Named after the former president, this hall hosts inspiring lectures and prestigious events. Perfect for special gatherings and VIP events.",
         amenities: ["Projector", "Sound System", "Air Conditioning", "Multi-level Seating"],
-        images: ["/assets/apj/apj1.jpg", "/assets/apj/apj2.jpg"],
+        images: [
+            "/uploads/auditorium/apj1.jpg"
+        ],
         available: true,
         contactInfo: "apjhall@college.edu",
         size: "medium"
@@ -201,7 +207,9 @@ const sampleAuditoriums = [
         location: "PEB Block, Ground Floor",
         description: "A dedicated hall for training sessions and technical workshops. Equipped with modern facilities to enhance learning experience.",
         amenities: ["Projector", "Computers", "Whiteboard"],
-        images: ["/assets/peb/peb1.jpg", "/assets/peb/peb2.jpg"],
+        images: [
+            "/uploads/auditorium/peb1.jpg",
+        ],
         available: true,
         contactInfo: "pebhall@college.edu",
         size: "small"
