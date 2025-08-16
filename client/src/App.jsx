@@ -21,6 +21,7 @@ import AuditoriumDetails from "./pages/Audis/AuditoriumDetails";
 import AddAuditorium from "./pages/Audis/AddAuditorium";
 import AdminProfile from "./admin/AdminProfile";
 import UserProfile from "./user/UserProfile";
+import AuthDebug from "./components/AuthDebug";
 
 
 function AppContent() {
@@ -81,6 +82,9 @@ function AppContent() {
                     <Route path="/admin/manage-auditoriums" element={isLoggedIn&&userRole==='admin'?<ManageAuditoriums />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/auditoriums/:id" element={isLoggedIn&&userRole==='admin'?<EditAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/profile" element={isLoggedIn&&userRole==='admin'?<AdminProfile />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+
+                    {/* Debug Route - Remove in production */}
+                    <Route path="/debug" element={<AuthDebug />} />
 
                     <Route path="*" element={<div className="p-10 text-center"><h2>404 Not Found</h2></div>} />
                 </Routes>

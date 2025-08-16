@@ -3,10 +3,12 @@ import { X, User, Mail, Building, Phone } from 'lucide-react';
 
 const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => {
   const [formData, setFormData] = useState({
-    name: userData?.name || '',
-    email: userData?.email || '',
-    department: userData?.department || '',
-    contact: userData?.contact || ''
+    firstName: userData?.profile?.firstName || userData?.name?.split(' ')[0] || '',
+    lastName: userData?.profile?.lastName || userData?.name?.split(' ').slice(1).join(' ') || '',
+    department: userData?.profile?.department || userData?.department || '',
+    contact: userData?.profile?.contact || userData?.contact || '',
+    bio: userData?.profile?.bio || '',
+    position: userData?.profile?.position || ''
   });
 
   const [errors, setErrors] = useState({});
@@ -29,14 +31,12 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Full name is required';
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
     }
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email format is invalid';
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
     }
 
     if (!formData.department.trim()) {
@@ -47,6 +47,10 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
       newErrors.contact = 'Contact number is required';
     } else if (!/^\+?[\d\s-()]+$/.test(formData.contact)) {
       newErrors.contact = 'Contact number format is invalid';
+    }
+
+    if (formData.bio && formData.bio.length > 500) {
+      newErrors.bio = 'Bio cannot exceed 500 characters';
     }
 
     setErrors(newErrors);
@@ -62,10 +66,12 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
 
   const handleReset = () => {
     setFormData({
-      name: userData?.name || '',
-      email: userData?.email || '',
-      department: userData?.department || '',
-      contact: userData?.contact || ''
+      firstName: userData?.profile?.firstName || userData?.name?.split(' ')[0] || '',
+      lastName: userData?.profile?.lastName || userData?.name?.split(' ').slice(1).join(' ') || '',
+      department: userData?.profile?.department || userData?.department || '',
+      contact: userData?.profile?.contact || userData?.contact || '',
+      bio: userData?.profile?.bio || '',
+      position: userData?.profile?.position || ''
     });
     setErrors({});
   };
@@ -96,42 +102,42 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white/5 backdrop-blur-sm rounded-b-2xl">
-          {/* Full Name */}
+          {/* First Name */}
           <div>
             <label className="block text-sm font-medium text-white/90 mb-2">
               <User className="w-4 h-4 inline mr-2" />
-              Full Name
+              First Name
             </label>
             <input
               type="text"
-              name="name"
-              value={formData.name}
+              name="firstName"
+              value={formData.firstName}
               onChange={handleChange}
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
+                errors.firstName ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Enter your full name"
+              placeholder="Enter your first name"
             />
-            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+            {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
           </div>
 
-          {/* Email */}
+          {/* Last Name */}
           <div>
             <label className="block text-sm font-medium text-white/90 mb-2">
-              <Mail className="w-4 h-4 inline mr-2" />
-              Email Address
+              <User className="w-4 h-4 inline mr-2" />
+              Last Name
             </label>
             <input
-              type="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              name="lastName"
+              value={formData.lastName}
               onChange={handleChange}
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
+                errors.lastName ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Enter your email address"
+              placeholder="Enter your last name"
             />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+            {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
           </div>
 
           {/* Department */}
@@ -153,6 +159,22 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
             {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
           </div>
 
+          {/* Position */}
+          <div>
+            <label className="block text-sm font-medium text-white/90 mb-2">
+              <Building className="w-4 h-4 inline mr-2" />
+              Position/Title
+            </label>
+            <input
+              type="text"
+              name="position"
+              value={formData.position}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              placeholder="Enter your position or title"
+            />
+          </div>
+
           {/* Contact Number */}
           <div>
             <label className="block text-sm font-medium text-white/90 mb-2">
@@ -170,6 +192,28 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               placeholder="Enter your contact number"
             />
             {errors.contact && <p className="text-red-500 text-sm mt-1">{errors.contact}</p>}
+          </div>
+
+          {/* Bio */}
+          <div>
+            <label className="block text-sm font-medium text-white/90 mb-2">
+              Bio (Optional)
+            </label>
+            <textarea
+              name="bio"
+              value={formData.bio}
+              onChange={handleChange}
+              rows={3}
+              maxLength={500}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 resize-none ${
+                errors.bio ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="Tell us a bit about yourself..."
+            />
+            <div className="flex justify-between text-sm text-white/60 mt-1">
+              <span>{errors.bio && <span className="text-red-500">{errors.bio}</span>}</span>
+              <span>{formData.bio.length}/500</span>
+            </div>
           </div>
 
           {/* Buttons */}

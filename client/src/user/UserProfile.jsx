@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import ProfileCard from '../components/profile/ProfileCard';
 import PasswordChangeModal from '../components/profile/PasswordChangeModal';
 import FeedbackModal from '../components/profile/FeedbackModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
+import { profileAPI } from '../services/profileAPI';
 
 const UserProfile = () => {
   const [modals, setModals] = useState({
@@ -12,14 +15,44 @@ const UserProfile = () => {
     editProfile: false
   });
 
-  // Mock user data - replace with actual user data from context/props
-  const [userData, setUserData] = useState({
-    name: 'John Doe',
-    email: 'john.doe@college.edu',
-    department: 'Computer Science Engineering',
-    contact: '+91 9876543210',
-    profilePic: null // Will be null if no profile picture is uploaded
-  });
+  // User data state - replace with actual user data from API
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Toast notification function
+  const showToast = (type, message) => {
+    toast[type](message, {
+      position: "top-right",
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  };
+
+  // Load user profile data
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await profileAPI.getProfile();
+      if (response.success) {
+        setUserData(response.data);
+      } else {
+        setError('Failed to load profile data');
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      setError(error.message || 'Failed to load profile data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openModal = (modalType) => {
     setModals(prev => ({
@@ -35,49 +68,90 @@ const UserProfile = () => {
     }));
   };
 
-  const handlePasswordChange = (passwordData) => {
-    console.log('Password change data:', passwordData);
-    // TODO: Implement password change API call
-    alert('Password change functionality will be implemented with backend integration');
-    closeModal('passwordChange');
+  const handlePasswordChange = async (passwordData) => {
+    try {
+      console.log('Password change request data:', passwordData);
+      const response = await profileAPI.changePassword(passwordData);
+      console.log('Password change response:', response);
+      if (response.success) {
+        showToast('success', 'Password changed successfully!');
+        closeModal('passwordChange');
+      } else {
+        console.error('Password change failed:', response);
+        showToast('error', response.message || 'Failed to change password');
+      }
+    } catch (error) {
+      console.error('Password change error:', error);
+      showToast('error', error.message || 'Error changing password');
+    }
   };
 
-  const handleFeedback = (feedbackData) => {
-    console.log('Feedback data:', feedbackData);
-    // TODO: Implement feedback submission API call
-    alert('Feedback submitted successfully! (Frontend only)');
-    closeModal('feedback');
+  const handleFeedback = async (feedbackData) => {
+    try {
+      const response = await profileAPI.submitFeedback(feedbackData);
+      if (response.success) {
+        showToast('success', 'Feedback submitted successfully!');
+        closeModal('feedback');
+      } else {
+        showToast('error', response.message || 'Failed to submit feedback');
+      }
+    } catch (error) {
+      console.error('Feedback submission error:', error);
+      showToast('error', error.message || 'Error submitting feedback');
+    }
   };
 
-  const handleReporting = (reportData) => {
-    console.log('Report data:', reportData);
-    // TODO: Implement reporting API call
-    alert('Report submitted successfully! (Frontend only)');
-    closeModal('reporting');
+  const handleReporting = async (reportData) => {
+    try {
+      const response = await profileAPI.submitReport(reportData);
+      if (response.success) {
+        showToast('success', 'Report submitted successfully!');
+        closeModal('reporting');
+      } else {
+        showToast('error', response.message || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Report submission error:', error);
+      showToast('error', error.message || 'Error submitting report');
+    }
   };
 
-  const handleEditProfile = (profileData) => {
-    console.log('User profile update data:', profileData);
-    // TODO: Implement user profile update API call
-    setUserData(prevData => ({
-      ...prevData,
-      ...profileData
-    }));
-    alert('Profile updated successfully! (Frontend only)');
-    closeModal('editProfile');
+  const handleEditProfile = async (profileData) => {
+    try {
+      const response = await profileAPI.updateProfile(profileData);
+      if (response.success) {
+        setUserData(response.data);
+        showToast('success', 'Profile updated successfully!');
+        closeModal('editProfile');
+      } else {
+        showToast('error', response.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Profile update error:', error);
+      showToast('error', error.message || 'Error updating profile');
+    }
   };
 
-  const handleProfilePicChange = () => {
-    // TODO: Implement profile picture upload
+  const handleProfilePicChange = async () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = e.target.files[0];
       if (file) {
-        console.log('Selected file:', file);
-        // TODO: Upload file and update profile picture
-        alert('Profile picture upload will be implemented with backend integration');
+        try {
+          const response = await profileAPI.uploadProfilePicture(file);
+          if (response.success) {
+            // Reload profile to get updated data
+            await loadUserProfile();
+            showToast('success', 'Profile picture uploaded successfully!');
+          } else {
+            showToast('error', response.message || 'Failed to upload profile picture');
+          }
+        } catch (error) {
+          console.error('Profile picture upload error:', error);
+          showToast('error', error.message || 'Error uploading profile picture');
+        }
       }
     };
     input.click();
@@ -92,46 +166,97 @@ const UserProfile = () => {
           <p className="text-gray-600">Manage your account settings and preferences</p>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="w-full max-w-4xl mb-6">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              <strong className="font-bold">Error!</strong>
+              <span className="block sm:inline"> {error}</span>
+              <button 
+                onClick={loadUserProfile}
+                className="ml-4 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Profile Card */}
-        <div className="w-full max-w-4xl">
-          <ProfileCard
-            userType="user"
-            userData={userData}
-            onPasswordChange={() => openModal('passwordChange')}
-            onFeedback={() => openModal('feedback')}
-            onReporting={() => openModal('reporting')}
-            onProfilePicChange={handleProfilePicChange}
-            onEditProfile={() => openModal('editProfile')}
-          />
-        </div>
+        {!loading && !error && userData && (
+          <div className="w-full max-w-4xl">
+            <ProfileCard
+              userType="user"
+              userData={{
+                name: userData.profile?.fullName || `${userData.profile?.firstName || ''} ${userData.profile?.lastName || ''}`.trim() || userData.username,
+                email: userData.email,
+                department: userData.profile?.department || 'Not specified',
+                contact: userData.profile?.contact || 'Not provided',
+                profilePic: userData.profile?.profilePicture ? `http://localhost:5001${userData.profile.profilePicture}` : null,
+                bio: userData.profile?.bio || '',
+                position: userData.profile?.position || userData.role
+              }}
+              onPasswordChange={() => openModal('passwordChange')}
+              onFeedback={() => openModal('feedback')}
+              onReporting={() => openModal('reporting')}
+              onProfilePicChange={handleProfilePicChange}
+              onEditProfile={() => openModal('editProfile')}
+            />
+          </div>
+        )}
 
         {/* Modals */}
-        <PasswordChangeModal
-          isOpen={modals.passwordChange}
-          onClose={() => closeModal('passwordChange')}
-          onSubmit={handlePasswordChange}
-        />
+        {userData && (
+          <>
+            <PasswordChangeModal
+              isOpen={modals.passwordChange}
+              onClose={() => closeModal('passwordChange')}
+              onSubmit={handlePasswordChange}
+            />
 
-        <FeedbackModal
-          isOpen={modals.feedback}
-          onClose={() => closeModal('feedback')}
-          onSubmit={handleFeedback}
-          type="feedback"
-        />
+            <FeedbackModal
+              isOpen={modals.feedback}
+              onClose={() => closeModal('feedback')}
+              onSubmit={handleFeedback}
+              type="feedback"
+            />
 
-        <FeedbackModal
-          isOpen={modals.reporting}
-          onClose={() => closeModal('reporting')}
-          onSubmit={handleReporting}
-          type="reporting"
-        />
+            <FeedbackModal
+              isOpen={modals.reporting}
+              onClose={() => closeModal('reporting')}
+              onSubmit={handleReporting}
+              type="reporting"
+            />
 
-        <EditProfileModal
-          isOpen={modals.editProfile}
-          onClose={() => closeModal('editProfile')}
-          onSubmit={handleEditProfile}
-          userData={userData}
-          userType="user"
+            <EditProfileModal
+              isOpen={modals.editProfile}
+              onClose={() => closeModal('editProfile')}
+              onSubmit={handleEditProfile}
+              userData={userData}
+              userType="user"
+            />
+          </>
+        )}
+
+        {/* Toast Container */}
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
         />
       </div>
     </div>

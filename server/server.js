@@ -11,6 +11,8 @@ const authRoutes = require('./routes/auth');
 const auditoriumRoutes = require('./routes/auditoriumRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
+const profileRoutes = require('./routes/profileRoutes');
+const adminProfileRoutes = require('./routes/adminProfileRoutes');
 
 // --- Service Imports ---
 const { startReminderScheduler } = require('./services/reminderScheduler'); // <-- ADDED Import
@@ -36,6 +38,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auditoriums', auditoriumRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/admin/profile', adminProfileRoutes);
 
 // --- Root Route (Simple Check) ---
 app.get('/api', (req, res) => {

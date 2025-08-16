@@ -49,6 +49,9 @@ const ProfileCard = ({
         <div className="flex-1 text-center md:text-left">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">{userData.name}</h1>
           <p className="text-lg text-gray-600 mb-1 capitalize">{userType}</p>
+          {userData.position && (
+            <p className="text-md text-gray-500 mb-2">{userData.position}</p>
+          )}
           <div className="flex flex-wrap justify-center md:justify-start gap-4 text-sm text-gray-500">
             <div className="flex items-center space-x-1">
               <Mail className="w-4 h-4" />
@@ -63,6 +66,11 @@ const ProfileCard = ({
               <span>{userData.contact}</span>
             </div>
           </div>
+          {userData.bio && (
+            <div className="mt-3 text-sm text-gray-600 max-w-md">
+              <p>{userData.bio}</p>
+            </div>
+          )}
         </div>
       </div>
 
