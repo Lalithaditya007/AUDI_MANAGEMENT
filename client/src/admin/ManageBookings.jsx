@@ -43,7 +43,7 @@ const ManageBookings = () => {
   // Error State
   const [fetchError, setFetchError] = useState("");
   const [departmentFetchError, setDepartmentFetchError] = useState("");
-  const [actionError, setActionError] = useState("");
+  // Removed unused actionError state
   const [imgErrors, setImgErrors] = useState({}); // Key: bookingId, Value: boolean
 
   // Filter State
@@ -58,16 +58,11 @@ const ManageBookings = () => {
   const [rejectReasons, setRejectReasons] = useState({}); // Key: bookingId, Value: reason text
   const [approvingId, setApprovingId] = useState(null); // ID of booking being approved
   const [rejectingId, setRejectingId] = useState(null); // ID of booking being rejected (confirm step)
-  const [actionSuccess, setActionSuccess] = useState("");
+  // Removed unused actionSuccess state
   const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
 
   // --- Helpers ---
-  /** Sets temporary feedback message and clears it after a duration. */
-  const showTemporaryFeedback = (setter, message, duration = 5000) => {
-    setter(message);
-    const timer = setTimeout(() => setter(""), duration);
-    return () => clearTimeout(timer); // Return cleanup function
-  };
+  // Removed unused showTemporaryFeedback helper
 
   /** Shows toast notification instead of inline message. */
   const showToast = (type, message) => {
@@ -181,7 +176,7 @@ const ManageBookings = () => {
         try {
           const data = await response.json();
           errorMsg = data.message || errorMsg;
-        } catch (e) { /* ignore JSON parsing error if response wasn't JSON */ }
+  } catch { /* ignore JSON parsing error if response wasn't JSON */ }
         throw new Error(errorMsg);
       }
 
@@ -447,21 +442,12 @@ const ManageBookings = () => {
       />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative">
-        <h1 className="text-3xl sm:text-4xl font-bold text-center text-red-800 mb-8 tracking-tight">
+  <h1 className="text-3xl sm:text-4xl font-bold text-center text-red-800 mb-8 tracking-tight mt-20">
           Manage Booking Requests
         </h1>
 
         {/* --- Global Feedback Area --- */}
-        {actionError && (
-          <div className="mb-6 p-3 text-center text-sm font-medium text-red-800 bg-red-100 rounded-md border border-red-200 shadow-sm" role="alert">
-            {actionError}
-          </div>
-        )}
-        {actionSuccess && (
-          <div className="mb-6 p-3 text-center text-sm font-medium text-green-800 bg-green-100 rounded-md border border-green-200 shadow-sm" role="alert">
-            {actionSuccess}
-          </div>
-        )}
+  {/* Removed unused actionError and actionSuccess feedback display */}
         {/* --- Loading and Error States --- */}
         {isLoading && (
           <div className="text-center py-16">
@@ -601,7 +587,7 @@ const ManageBookings = () => {
                   // Determine if actions should be disabled
                   const isAnyActionInProgress = !!(approvingId || rejectingId);
                   // Disable buttons for THIS booking if its action is processing
-                  const disableActionsForThisBooking = isAnyActionInProgress && (approvingId === booking._id || rejectingId === booking._id);
+                  // Removed unused disableActionsForThisBooking variable
 
                   return (
                     <div key={booking._id} className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sm:p-6 overflow-hidden hover:shadow-md transition-shadow duration-200">
@@ -617,7 +603,7 @@ const ManageBookings = () => {
                               src={fullImageUrl}
                               alt={`${booking.eventName || "Event"} Poster`}
                               className="w-full h-full object-cover"
-                              onError={(e) => {
+                              onError={() => {
                                 console.error(`Failed to load image: ${fullImageUrl}`); // Add debug log
                                 handleImageError(booking._id);
                               }}

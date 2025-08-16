@@ -49,7 +49,7 @@ const KSAuditorium = () => {
       <div className="max-w-6xl mx-auto px-6 py-12">
         {/* About Section */}
         <section className="mb-12">
-          <h2 className="text-3xl font-semibold text-[#82001A] border-b-2 border-[#82001A] inline-block pb-2 mb-4">
+          <h2 className="text-3xl font-semibold text-[#82001A] border-b-2 border-[#82001A] inline-block pb-2 mb-4 mt-20">
             About the Auditorium
           </h2>
           <p className="text-gray-800 text-lg leading-relaxed">

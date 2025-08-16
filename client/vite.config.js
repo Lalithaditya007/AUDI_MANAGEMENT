@@ -6,9 +6,10 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: 'http://192.168.1.100:5001',
         changeOrigin: true,
         secure: false,
       },
@@ -30,7 +31,6 @@ export default defineConfig({
           "100%": { transform: "translateX(-100%)" },
         },
       },
-    },
-  },
+    },
+  },
 });
-

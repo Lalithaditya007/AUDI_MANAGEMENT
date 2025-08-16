@@ -164,7 +164,7 @@ const CreateUser = () => {
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Page Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New User</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 mt-20">Create New User</h1>
           <p className="text-lg text-gray-600">Add a new user or administrator to the system</p>
         </div>
 
