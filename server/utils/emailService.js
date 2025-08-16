@@ -1,54 +1,80 @@
 // server/utils/emailService.js
+/**
+ * Email Service using Gmail with App Password Authentication
+ * 
+ * Setup Instructions:
+ * 1. Go to your Google Account settings
+ * 2. Enable 2-Factor Authentication if not already enabled
+ * 3. Go to Security → 2-Step Verification → App passwords
+ * 4. Generate a new app password for "Mail"
+ * 5. Use the generated 16-character password in GMAIL_APP_PASSWORD env variable
+ * 
+ * Required Environment Variables:
+ * - GMAIL_USER: Your Gmail address (e.g., vnrauditoriums@gmail.com)
+ * - GMAIL_APP_PASSWORD: Your Gmail app password (16 characters)
+ * - ADMIN_EMAIL: Admin email for notifications
+ */
+
 const nodemailer = require('nodemailer');
-const { google } = require('googleapis');
 const { DateTime } = require('luxon'); // For date formatting
 require('dotenv').config(); // Ensure environment variables are loaded early
 
 // --- Constants ---
 const istTimezone = 'Asia/Kolkata'; // For display formatting
 const emailUser = process.env.GMAIL_USER; // Your sending Gmail address
-const clientId = process.env.CLIENT_ID;
-const clientSecret = process.env.CLIENT_SECRET;
-const refreshToken = process.env.REFRESH_TOKEN;
-const redirectUri = 'https://developers.google.com/oauthplayground';
+const appPassword = process.env.GMAIL_APP_PASSWORD; // Gmail App Password
 
 // --- Input Validation ---
-if (!emailUser || !clientId || !clientSecret || !refreshToken) {
-  console.error("[Email FATAL] Missing required environment variables for email service (GMAIL_USER, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN). Email sending will likely fail.");
+if (!emailUser || !appPassword) {
+  console.error("[Email FATAL] Missing required environment variables for email service (GMAIL_USER, GMAIL_APP_PASSWORD). Email sending will likely fail.");
 } else {
     console.log("[Email Service] Configuration loaded. Attempting to initialize transporter.");
 }
 
-// --- OAuth2 Client Setup ---
-const Oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-Oauth2Client.setCredentials({ refresh_token: refreshToken });
-
 // --- Helper: Create Nodemailer Transporter ---
 let transporterInstance = null;
 async function createTransporter() {
-    // ... (keep existing implementation - no changes needed here) ...
-    if (transporterInstance) { return transporterInstance; }
+    if (transporterInstance) { 
+        return transporterInstance; 
+    }
+    
     try {
-        console.log('[Email] Attempting to get new access token for transporter...');
-        const accessTokenResponse = await Oauth2Client.getAccessToken();
-        const accessToken = accessTokenResponse.token;
-        if (!accessToken) { throw new Error("Failed to obtain access token using refresh token."); }
-        console.log('[Email] Access token obtained successfully.');
+        console.log('[Email] Creating transporter with app password authentication...');
+        
         const transporter = nodemailer.createTransport({
             service: 'gmail',
-            auth: { type: 'OAuth2', user: emailUser, clientId: clientId, clientSecret: clientSecret, refreshToken: refreshToken, accessToken: accessToken, },
-            pool: true, maxConnections: 5, maxMessages: Infinity, rateLimit: 10, logger: false, debug: false
+            auth: {
+                user: emailUser,
+                pass: appPassword
+            },
+            pool: true,
+            maxConnections: 5,
+            maxMessages: Infinity,
+            rateLimit: 10,
+            logger: false,
+            debug: false
         });
+        
         transporterInstance = transporter;
         console.log("[Email Service] Transporter created and cached.");
-        try { await transporter.verify(); console.log("[Email Service] Transporter verified successfully."); } catch (verifyError) { console.warn("[Email Service WARN] Transporter verification failed:", verifyError.message || verifyError); }
+        
+        try { 
+            await transporter.verify(); 
+            console.log("[Email Service] Transporter verified successfully."); 
+        } catch (verifyError) { 
+            console.warn("[Email Service WARN] Transporter verification failed:", verifyError.message || verifyError); 
+        }
+        
         return transporter;
     } catch (error) {
         console.error("[Email Service FATAL] Error creating or authenticating email transporter:", error.message || error);
-        if (error.response?.data?.error === 'invalid_grant') { console.error("[Email Service FATAL] OAUTH ERROR: Invalid grant - Refresh token might be expired/revoked."); console.error("[Email Service FATAL] ACTION NEEDED: Re-authenticate your application."); }
-        else if (error.response?.data?.error === 'invalid_client') { console.error("[Email Service FATAL] OAUTH ERROR: Invalid client - Check CLIENT_ID and CLIENT_SECRET."); }
-        else if (error.code === 'EENVELOPE' || error.code === 'EAUTH' || error.message.includes('auth failed')) { console.error("[Email Service FATAL] SMTP AUTH ERROR: Check OAuth credentials or Gmail settings."); }
-        else if (error.message.includes('ENOTFOUND') || error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED')) { console.error("[Email Service FATAL] NETWORK ERROR: Could not connect to Google servers."); }
+        
+        if (error.code === 'EAUTH' || error.message.includes('auth failed')) { 
+            console.error("[Email Service FATAL] SMTP AUTH ERROR: Check Gmail credentials or app password."); 
+        } else if (error.message.includes('ENOTFOUND') || error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED')) { 
+            console.error("[Email Service FATAL] NETWORK ERROR: Could not connect to Google servers."); 
+        }
+        
         transporterInstance = null;
         throw new Error('Failed to initialize email service transporter.');
     }
