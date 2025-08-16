@@ -86,6 +86,11 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
                                                 History
                                             </NavLink>
                                         </li>
+                                        <li>
+                                            <NavLink to="/user/profile" className={getNavLinkClass}>
+                                                Profile
+                                            </NavLink>
+                                        </li>
                                     </>
                                 )}
                                 {userRole === "admin" && (
@@ -103,6 +108,11 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
                                         <li>
                                             <NavLink to="/admin/schedule-viewer" className={getNavLinkClass}>
                                                 Schedule
+                                            </NavLink>
+                                        </li>
+                                        <li>
+                                            <NavLink to="/admin/profile" className={getNavLinkClass}>
+                                                Profile
                                             </NavLink>
                                         </li>
                                     </>

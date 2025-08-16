@@ -18,6 +18,11 @@ const UserNavbar = () => {
             </Link>
           </li>
           <li>
+            <Link to="/user/profile" className="hover:underline">
+              Profile
+            </Link>
+          </li>
+          <li>
             <Link to="/" className="hover:underline">
               Logout
             </Link>

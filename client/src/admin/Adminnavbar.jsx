@@ -36,6 +36,10 @@ const AdminNavbar = () => {
                 `hover:underline ${isActive ? 'font-bold' : ''}`}>
                 Create User
               </NavLink>
+              <NavLink to="/admin/profile" className={({isActive}) => 
+                `hover:underline ${isActive ? 'font-bold' : ''}`}>
+                Profile
+              </NavLink>
               <NavLink to="/" className={({isActive}) => 
                 `hover:underline ${isActive ? 'font-bold' : ''}`}>
                 Logout

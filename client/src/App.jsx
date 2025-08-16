@@ -17,6 +17,8 @@ import AdminScheduleViewer from "./admin/AdminScheduleViewer";
 import Footer from "./components/Footer";
 import AuditoriumDetails from "./pages/Audis/AuditoriumDetails";
 import AddAuditorium from "./pages/Audis/AddAuditorium";
+import AdminProfile from "./admin/AdminProfile";
+import UserProfile from "./user/UserProfile";
 
 
 function AppContent() {
@@ -66,6 +68,7 @@ function AppContent() {
                     {/* User Routes */}
                     <Route path="/book-auditorium" element={isLoggedIn&&userRole==='user'?<BookAuditorium userEmail={userEmail}/>:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/booking-history" element={isLoggedIn&&userRole==='user'?<BookingHistory />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+                    <Route path="/user/profile" element={isLoggedIn&&userRole==='user'?<UserProfile />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
 
                     {/* Admin Routes */}
                     <Route path="/admin-dashboard" element={isLoggedIn&&userRole==='admin'?<AdminDashboard />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
@@ -73,6 +76,7 @@ function AppContent() {
                     <Route path="/admin/create-user" element={isLoggedIn&&userRole==='admin'?<CreateUser />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/schedule-viewer" element={isLoggedIn&&userRole==='admin'?<AdminScheduleViewer />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/add-auditorium" element={isLoggedIn&&userRole==='admin'?<AddAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+                    <Route path="/admin/profile" element={isLoggedIn&&userRole==='admin'?<AdminProfile />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
 
                     <Route path="*" element={<div className="p-10 text-center"><h2>404 Not Found</h2></div>} />
                 </Routes>
