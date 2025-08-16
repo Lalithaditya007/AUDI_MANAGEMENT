@@ -1,4 +1,4 @@
-# profile section(pending   )
+# profile section(pending)
 
 # admin should be notified if the event request is in pending when no time left (5 days left ) // pop up on home page 
 
@@ -16,21 +16,12 @@
 
 # pages should load from top if tehyre opened from footer links or any other redirects
 
-# review section need to contain data from the user reviews including images , fedback
+# review section need to contain data from the user reviews including images , fedback()
 
 # add student chapters  / department checkbox input while booking and use the respective input box
-
-# add reidirecting link for "book now " button  on home page 
-
 # update event timings in user booing history , if it is a multi day event 
-
 #  dispay events list (along with images ) based on the given date , year 
-
-# hide quick links for the admins  (in footer )
-
 # change social media handle in the fooer 
-
-#  update venues in footer and retrive from db 
 
 # enable booking directly from  auditoriums pages , that auditorium name is passed as paramter for the booking page 
 

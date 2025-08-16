@@ -130,11 +130,10 @@ const HomePage = ({ isLoggedIn, userRole }) => {
               )}
             </div>
           </div>
-          {/* Arrow moved below button above */}
-          {/* Fixed arrow at bottom, 50px up */}
-          <div className="fixed left-1/2 transform -translate-x-1/2 bottom-[50px] z-50 animate-bounce">
-            <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-          </div>
+        </div>
+        {/* Arrow absolutely positioned at the bottom of the hero image */}
+        <div className="absolute left-1/2 bottom-8 transform -translate-x-1/2 z-30 animate-bounce">
+          <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
         </div>
       </header>
 
