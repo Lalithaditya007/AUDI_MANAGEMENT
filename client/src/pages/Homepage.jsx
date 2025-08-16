@@ -57,7 +57,7 @@ function FeaturedAuditoriums() {
             <div className="h-64 overflow-hidden relative">
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
               <img
-                src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? auditorium.images[0] : ksaudi}
+                src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? (auditorium.images[0].startsWith('http') ? auditorium.images[0] : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${auditorium.images[0]}`) : ksaudi}
                 alt={auditorium.name}
                 className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
               <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
@@ -130,11 +130,10 @@ const HomePage = ({ isLoggedIn, userRole }) => {
               )}
             </div>
           </div>
-          {/* Arrow moved below button above */}
-          {/* Fixed arrow at bottom, 50px up */}
-          <div className="fixed left-1/2 transform -translate-x-1/2 bottom-[50px] z-50 animate-bounce">
-            <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-          </div>
+        </div>
+        {/* Arrow absolutely positioned at the bottom of the hero image */}
+        <div className="absolute left-1/2 bottom-8 transform -translate-x-1/2 z-30 animate-bounce">
+          <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
         </div>
       </header>
 

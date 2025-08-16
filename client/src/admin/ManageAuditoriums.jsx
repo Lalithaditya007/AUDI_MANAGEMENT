@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import AuditoriumPreviewModal from './AuditoriumPreviewModal';
+import Slider from 'react-slick';
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 import { useNavigate } from 'react-router-dom';
 import { FaTrash, FaEdit, FaPlus } from 'react-icons/fa';
 
@@ -70,11 +73,28 @@ const ManageAuditoriums = () => {
           {auditoriums.map(aud => (
             <div key={aud._id} className="bg-white rounded-lg shadow p-0 flex flex-col gap-2 relative group border border-gray-200 hover:shadow-lg transition cursor-pointer" onClick={() => handlePreview(aud)}>
               {aud.images && aud.images.length > 0 ? (
-                <img
-                  src={aud.images[0]?.startsWith('http') ? aud.images[0] : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${aud.images[0]}`}
-                  alt={aud.name}
-                  className="w-full h-40 object-cover rounded-t-lg"
-                />
+                <Slider
+                  dots={true}
+                  infinite={true}
+                  speed={350}
+                  slidesToShow={1}
+                  slidesToScroll={1}
+                  arrows={true}
+                  adaptiveHeight={true}
+                  autoplay={true}
+                  autoplaySpeed={1200}
+                  className="w-full h-40 rounded-t-lg"
+                >
+                  {aud.images.map((img, idx) => (
+                    <div key={idx} className="flex justify-center items-center">
+                      <img
+                        src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`}
+                        alt={aud.name}
+                        className="w-full h-40 object-cover rounded-t-lg"
+                      />
+                    </div>
+                  ))}
+                </Slider>
               ) : (
                 <div className="w-full h-40 bg-gray-200 flex items-center justify-center rounded-t-lg text-gray-400">No Image</div>
               )}

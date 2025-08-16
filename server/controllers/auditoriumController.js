@@ -31,9 +31,9 @@ exports.createAuditorium = async (req, res, next) => {
   const createdBy = body.createdBy;
   const customFields = body.customFields;
   let images = [];
-  if (req.file) {
-    // Store path relative to /uploads/auditorium/
-    images.push(`/uploads/auditorium/${req.file.filename}`);
+  // Handle multiple uploaded files (multer's upload.array)
+  if (req.files && req.files.length > 0) {
+    images = req.files.map(file => `/uploads/auditorium/${file.filename}`);
   } else if (body.images) {
     // fallback for JSON
     images = Array.isArray(body.images) ? body.images : [body.images];
@@ -143,7 +143,7 @@ exports.getAuditoriumById = async (req, res, next) => {
 
 exports.updateAuditorium = async (req, res, next) => {
   const auditoriumId = req.params.id;
-  const updateData = req.body;
+  let updateData = req.body;
   // Only allow fields defined in schema
   const allowedFields = [
     'name', 'capacity', 'location', 'description', 'amenities', 'images', 'available', 'createdBy', 'contactInfo', 'customFields', 'size'
@@ -153,6 +153,23 @@ exports.updateAuditorium = async (req, res, next) => {
       delete updateData[key];
     }
   });
+
+  // Handle amenities and size for multipart form data
+  if (Array.isArray(updateData.amenities)) {
+    updateData.amenities = updateData.amenities.flat().map(a => a.trim()).filter(Boolean);
+  } else if (typeof updateData.amenities === 'string') {
+    updateData.amenities = updateData.amenities.split(',').map(a => a.trim()).filter(Boolean);
+  }
+  if (Array.isArray(updateData.size)) {
+    updateData.size = updateData.size.find(s => typeof s === 'string' && s.length > 0) || '';
+  }
+
+  // Handle multiple uploaded files (multer's upload.array)
+  if (req.files && req.files.length > 0) {
+    updateData.images = req.files.map(file => `/uploads/auditorium/${file.filename}`);
+  } else if (updateData.images) {
+    updateData.images = Array.isArray(updateData.images) ? updateData.images : [updateData.images];
+  }
 
   // Validate ID format
   if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {
