@@ -205,11 +205,9 @@ const HomePage = ({ isLoggedIn, userRole }) => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-20 bg-red-50 relative overflow-hidden">{/* ... content ... */}</section>
+  {/* Testimonials Section Removed */}
 
-      {/* Final CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-red-700 to-red-900 relative overflow-hidden">{/* ... content ... */}</section>
+  {/* Final CTA Section Removed */}
     </div>
   );
 }
