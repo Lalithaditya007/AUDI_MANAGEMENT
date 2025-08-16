@@ -32,7 +32,8 @@ exports.createAuditorium = async (req, res, next) => {
   const customFields = body.customFields;
   let images = [];
   if (req.file) {
-    images.push(`/uploads/${req.file.filename}`);
+    // Store path relative to /uploads/auditorium/
+    images.push(`/uploads/auditorium/${req.file.filename}`);
   } else if (body.images) {
     // fallback for JSON
     images = Array.isArray(body.images) ? body.images : [body.images];

@@ -34,20 +34,24 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
 
     return (
         <>
-            <nav className={`fixed top-0 left-0 right-0 p-4 shadow-md z-50 bg-white transition-all duration-300`}>
+            <nav className={`fixed top-0 left-0 right-0 p-4 shadow-md z-50 bg-white transition-all duration-300 `}>
                 <div className="container mx-auto flex justify-between items-center flex-wrap">
                     <div className="flex items-center space-x-4 mb-2 sm:mb-0 mr-4">
-                        <img
-                            src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
-                            alt="VNR VJIET Symbol"
-                            className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0"
-                        />
+                        <a href="/">
+                            <img
+                                src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
+                                alt="VNR VJIET Symbol"
+                                className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0"
+                            />
+                        </a>
+                        <a href="/">
                         <div>
                             <h1 className="text-lg sm:text-xl font-bold text-red-900 leading-tight">
                                 Vallurupalli Nageswara Rao <br className="hidden sm:inline" />Vignana Jyothi Institute
                             </h1>
                             <p className="text-xs sm:text-sm text-red-900">Vignana Jyothi Nagar, Hyderabad</p>
                         </div>
+                        </a>
                     </div>
 
                     <ul className="flex flex-wrap space-x-1 sm:space-x-2 items-center text-sm sm:text-base">

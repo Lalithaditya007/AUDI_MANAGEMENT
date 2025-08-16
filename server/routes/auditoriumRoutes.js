@@ -1,6 +1,5 @@
 const express = require('express');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+const upload = require('../multerConfig');
 const {
     createAuditorium,
     getAllAuditoriums,
@@ -12,9 +11,15 @@ const { protect, admin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+// Middleware to set uploadType for auditorium images
+function setAuditoriumUploadType(req, res, next) {
+    req.uploadType = 'auditorium';
+    next();
+}
+
 router.route('/')
-    .post(protect, admin, upload.single('image'), createAuditorium) 
-    .get(getAllAuditoriums);
+        .post(protect, admin, setAuditoriumUploadType, upload.single('image'), createAuditorium)
+        .get(getAllAuditoriums);
 
 router.route('/:id')
     .get(getAuditoriumById)
