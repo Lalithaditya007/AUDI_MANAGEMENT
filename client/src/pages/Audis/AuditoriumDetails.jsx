@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import Slider from 'react-slick';
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 import { useParams, Link } from 'react-router-dom';
 
 const AuditoriumDetails = () => {
@@ -31,11 +34,38 @@ const AuditoriumDetails = () => {
   if (error) return <div className="text-center text-red-600 mt-10">{error}</div>;
   if (!auditorium) return null;
 
+  // Carousel settings
+  const settings = {
+    dots: true,
+    infinite: true,
+    speed: 350,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    arrows: true,
+    adaptiveHeight: true,
+    autoplay: true,
+    autoplaySpeed: 1200,
+  };
+
   return (
     <div className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="text-4xl font-bold mb-4 text-[#82181A]">{auditorium.name}</h1>
       <div className="mb-6">
-        <img src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? auditorium.images[0] : ''} alt={auditorium.name} className="w-full h-64 object-cover rounded-xl shadow-lg" />
+        {Array.isArray(auditorium.images) && auditorium.images.length > 0 ? (
+          <Slider {...settings}>
+            {auditorium.images.map((img, idx) => (
+              <div key={idx} className="flex justify-center items-center">
+                <img
+                  src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`}
+                  alt={`Auditorium ${idx + 1}`}
+                  className="w-full h-64 object-cover rounded-xl shadow-lg"
+                />
+              </div>
+            ))}
+          </Slider>
+        ) : (
+          <div className="w-full h-64 bg-gray-200 flex items-center justify-center rounded-xl text-gray-400">No Image</div>
+        )}
       </div>
       <p className="text-lg text-gray-700 mb-4">{auditorium.description}</p>
       <div className="mb-4">

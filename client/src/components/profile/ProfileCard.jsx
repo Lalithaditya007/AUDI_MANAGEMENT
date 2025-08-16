@@ -30,7 +30,7 @@ const ProfileCard = ({
           <div className="w-32 h-32 rounded-full bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center overflow-hidden border-4 border-white/50 shadow-lg">
             {userData.profilePic ? (
               <img 
-                src={userData.profilePic} 
+                src={userData.profilePic && userData.profilePic.startsWith('http') ? userData.profilePic : userData.profilePic ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${userData.profilePic}` : ''} 
                 alt="Profile" 
                 className="w-full h-full object-cover"
               />

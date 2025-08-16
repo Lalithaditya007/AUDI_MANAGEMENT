@@ -128,7 +128,7 @@ const AddAuditorium = () => {
             <input type="file" accept="image/*" onChange={handleImageChange} className="w-full px-4 py-2 rounded-xl bg-white/60 border border-[#82181A]/30 focus:outline-none focus:ring-2 focus:ring-[#82181A]/40 shadow-sm" />
             <div className="mt-2 flex items-center justify-center">
               {imagePreview ? (
-                <img src={imagePreview} alt="Preview" className="h-32 w-32 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
+                <img src={imagePreview.startsWith('http') ? imagePreview : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${imagePreview}`} alt="Preview" className="h-32 w-32 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
               ) : (
                 <div className="h-32 w-32 flex items-center justify-center bg-white/40 text-[#82181A]/40 rounded-xl border border-[#82181A]/20 shadow">Image preview</div>
               )}

@@ -419,7 +419,7 @@ function BookingHistory() {
                             <div className="flex flex-col md:flex-row gap-5 items-start">
                                 {/* Image */}
                                 <div className={`flex-shrink-0 w-full md:w-44 h-44 rounded-lg shadow bg-gray-100 flex items-center justify-center overflow-hidden text-gray-400 relative ${imgUrl ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`} onClick={() => imgUrl && setZoomedImageUrl(imgUrl)} title={imgUrl ? "Zoom Poster" : "No Poster"}>
-                                    {imgUrl ? (<img src={imgUrl} alt={`${booking.eventName || "Event"} Poster`} className="w-full h-full object-cover" onError={(e)=>{if(e.target.src!==ERROR_IMAGE_URL){e.target.onerror=null; e.target.src=ERROR_IMAGE_URL;}}} loading="lazy"/>) : (<ImagePlaceholderIcon />)}
+                                    {imgUrl ? (<img src={imgUrl.startsWith('http') ? imgUrl : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${imgUrl}`} alt={`${booking.eventName || "Event"} Poster`} className="w-full h-full object-cover" onError={(e)=>{if(e.target.src!==ERROR_IMAGE_URL){e.target.onerror=null; e.target.src=ERROR_IMAGE_URL;}}} loading="lazy"/>) : (<ImagePlaceholderIcon />)}
                                 </div>
                                 {/* Details */}
                                 <div className="flex-1 min-w-0 space-y-2.5">
@@ -492,7 +492,7 @@ function BookingHistory() {
         )}
 
         {/* --- Image Zoom Modal --- */}
-        {zoomedImageUrl && ( <div className="fixed inset-0 z-[60] bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setZoomedImageUrl(null)}> <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden"> <img src={zoomedImageUrl} alt="Zoomed Poster" className="block max-w-full max-h-[90vh] object-contain mx-auto my-auto" onClick={(e)=>e.stopPropagation()}/> <button onClick={()=>setZoomedImageUrl(null)} className="absolute top-2 right-2 bg-white/70 hover:bg-white rounded-full p-1"><svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" /></svg></button> </div> </div> )}
+  {zoomedImageUrl && ( <div className="fixed inset-0 z-[60] bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setZoomedImageUrl(null)}> <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden"> <img src={zoomedImageUrl.startsWith('http') ? zoomedImageUrl : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${zoomedImageUrl}`} alt="Zoomed Poster" className="block max-w-full max-h-[90vh] object-contain mx-auto my-auto" onClick={(e)=>e.stopPropagation()}/> <button onClick={()=>setZoomedImageUrl(null)} className="absolute top-2 right-2 bg-white/70 hover:bg-white rounded-full p-1"><svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" /></svg></button> </div> </div> )}
 
         {/* Withdraw Confirmation Modal */}
         {showWithdrawModal && withdrawBooking && (

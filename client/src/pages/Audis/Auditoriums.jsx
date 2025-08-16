@@ -93,7 +93,7 @@ const Auditoriums = () => {
                 >
                   <div className="relative h-80">
                     <img
-                      src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? auditorium.images[0] : KSAudi}
+                      src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? (auditorium.images[0].startsWith('http') ? auditorium.images[0] : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${auditorium.images[0]}`) : KSAudi}
                       alt={auditorium.name}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />

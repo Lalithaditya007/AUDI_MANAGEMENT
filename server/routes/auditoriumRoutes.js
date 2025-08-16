@@ -18,11 +18,11 @@ function setAuditoriumUploadType(req, res, next) {
 }
 
 router.route('/')
-        .post(protect, admin, setAuditoriumUploadType, upload.single('image'), createAuditorium)
-        .get(getAllAuditoriums);
+    .post(protect, admin, setAuditoriumUploadType, upload.array('images', 5), createAuditorium)
+    .get(getAllAuditoriums);
 
 router.route('/:id')
     .get(getAuditoriumById)
-    .put(protect, admin, setAuditoriumUploadType, upload.single('image'), updateAuditorium)
+    .put(protect, admin, setAuditoriumUploadType, upload.array('images', 5), updateAuditorium)
     .delete(protect, admin, deleteAuditorium);
 module.exports = router;

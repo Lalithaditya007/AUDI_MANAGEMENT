@@ -16,8 +16,9 @@ const EditAuditorium = () => {
     contactInfo: '',
     size: '',
   });
-  const [imageFiles, setImageFiles] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]); // new files to upload
+  const [imagePreviews, setImagePreviews] = useState([]); // preview URLs for new files
+  const [existingImages, setExistingImages] = useState([]); // URLs for already uploaded images
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -35,7 +36,8 @@ const EditAuditorium = () => {
           ...data.data,
           amenities: Array.isArray(data.data.amenities) ? data.data.amenities.join(', ') : data.data.amenities,
         });
-        setImagePreviews(data.data.images || []);
+        setExistingImages(data.data.images || []);
+        setImagePreviews([]); // clear previews for new files
       } catch (err) {
         setError(err.message);
       } finally {
@@ -53,10 +55,21 @@ const EditAuditorium = () => {
     }));
   };
 
+  // Add new images to the list, keep existing images unless user removes them
   const handleImageChange = e => {
     const files = Array.from(e.target.files);
-    setImageFiles(files);
-    setImagePreviews(files.map(file => URL.createObjectURL(file)));
+    setImageFiles(prev => [...prev, ...files]);
+    setImagePreviews(prev => [...prev, ...files.map(file => URL.createObjectURL(file))]);
+  };
+
+  // Remove an existing image (already uploaded)
+  const handleRemoveExistingImage = idx => {
+    setExistingImages(prev => prev.filter((_, i) => i !== idx));
+  };
+  // Remove a new image (not yet uploaded)
+  const handleRemoveNewImage = idx => {
+    setImageFiles(prev => prev.filter((_, i) => i !== idx));
+    setImagePreviews(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleSubmit = async e => {
@@ -74,7 +87,10 @@ const EditAuditorium = () => {
         formData.append(key, value);
       });
       formData.append('amenities', form.amenities.split(',').map(a => a.trim()));
-      imageFiles.forEach(file => formData.append('image', file));
+      // Add existing images (not removed)
+      existingImages.forEach(img => formData.append('images', img));
+      // Add new images
+      imageFiles.forEach(file => formData.append('images', file));
       const token = localStorage.getItem('authToken');
       const res = await fetch(`/api/auditoriums/${id}`, {
         method: 'PUT',
@@ -123,12 +139,26 @@ const EditAuditorium = () => {
             <input name="amenities" value={form.amenities} onChange={handleChange} placeholder="Amenities (comma separated)" className="w-full px-4 py-2 rounded-xl bg-white/60 border border-[#82181A]/30 focus:outline-none focus:ring-2 focus:ring-[#82181A]/40 shadow-sm" />
           </div>
           <div className="space-y-2">
-            <label className="block font-semibold text-[#82181A] drop-shadow">Image Upload (will replace existing images)</label>
+            <label className="block font-semibold text-[#82181A] drop-shadow">Add Images (existing + new)</label>
             <input type="file" accept="image/*" multiple onChange={handleImageChange} className="w-full px-4 py-2 rounded-xl bg-white/60 border border-[#82181A]/30 focus:outline-none focus:ring-2 focus:ring-[#82181A]/40 shadow-sm" />
             <div className="mt-2 flex flex-wrap gap-2 items-center justify-center">
-              {imagePreviews.length > 0 ? imagePreviews.map((img, idx) => (
-                <img key={idx} src={img} alt="Preview" className="h-24 w-24 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
-              )) : <div className="h-24 w-24 flex items-center justify-center bg-white/40 text-[#82181A]/40 rounded-xl border border-[#82181A]/20 shadow">No image</div>}
+              {/* Existing images from backend */}
+              {existingImages.map((img, idx) => (
+                <div key={"existing-"+idx} className="relative group">
+                  <img src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`} alt="Existing" className="h-24 w-24 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
+                  <button type="button" onClick={() => handleRemoveExistingImage(idx)} className="absolute top-1 right-1 bg-white/80 rounded-full p-1 text-xs text-[#82181A] font-bold shadow group-hover:scale-110 transition-transform">&times;</button>
+                </div>
+              ))}
+              {/* New images to upload */}
+              {imagePreviews.map((img, idx) => (
+                <div key={"new-"+idx} className="relative group">
+                  <img src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`} alt="Preview" className="h-24 w-24 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
+                  <button type="button" onClick={() => handleRemoveNewImage(idx)} className="absolute top-1 right-1 bg-white/80 rounded-full p-1 text-xs text-[#82181A] font-bold shadow group-hover:scale-110 transition-transform">&times;</button>
+                </div>
+              ))}
+              {existingImages.length === 0 && imagePreviews.length === 0 && (
+                <div className="h-24 w-24 flex items-center justify-center bg-white/40 text-[#82181A]/40 rounded-xl border border-[#82181A]/20 shadow">No image</div>
+              )}
             </div>
           </div>
           <label className="flex items-center font-semibold text-[#82181A] drop-shadow"><input type="checkbox" name="available" checked={form.available} onChange={handleChange} className="mr-2 accent-[#82181A]" />Available</label>
