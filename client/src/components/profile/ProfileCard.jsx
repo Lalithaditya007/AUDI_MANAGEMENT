@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, Phone, Building, Camera, FileText, MessageSquare, Key } from 'lucide-react';
+import { User, Mail, Phone, Building, Camera, FileText, MessageSquare, Key, Edit } from 'lucide-react';
 
 const ProfileCard = ({ 
   userType = 'user', 
@@ -13,10 +13,9 @@ const ProfileCard = ({
   onPasswordChange,
   onFeedback,
   onReporting,
-  onProfilePicChange
+  onProfilePicChange,
+  onEditProfile
 }) => {
-  const [activeTab, setActiveTab] = useState('profile');
-
   return (
     <div className="max-w-4xl mx-auto relative">
       {/* Glassmorphism background */}
@@ -67,27 +66,21 @@ const ProfileCard = ({
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex space-x-8">
-          {['profile', 'actions'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab === 'profile' ? 'Profile Details' : 'Actions'}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {/* Profile Details Section */}
+      <div className="mb-8">
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-800">Profile Details</h2>
+          <button
+            onClick={onEditProfile}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <Edit className="w-4 h-4" />
+            <span>Edit Profile</span>
+          </button>
+        </div>
 
-      {/* Tab Content */}
-      {activeTab === 'profile' && (
+        {/* Profile Details Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -110,9 +103,14 @@ const ProfileCard = ({
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {activeTab === 'actions' && (
+      {/* Actions Section */}
+      <div>
+        {/* Section Header */}
+        <h2 className="text-xl font-semibold text-gray-800 mb-6">Actions</h2>
+        
+        {/* Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Change Password */}
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
@@ -159,7 +157,7 @@ const ProfileCard = ({
             </button>
           </div>
         </div>
-      )}
+      </div>
       </div>
     </div>
   );

@@ -2,22 +2,24 @@ import React, { useState } from 'react';
 import ProfileCard from '../components/profile/ProfileCard';
 import PasswordChangeModal from '../components/profile/PasswordChangeModal';
 import FeedbackModal from '../components/profile/FeedbackModal';
+import EditProfileModal from '../components/profile/EditProfileModal';
 
 const UserProfile = () => {
   const [modals, setModals] = useState({
     passwordChange: false,
     feedback: false,
-    reporting: false
+    reporting: false,
+    editProfile: false
   });
 
   // Mock user data - replace with actual user data from context/props
-  const userData = {
+  const [userData, setUserData] = useState({
     name: 'John Doe',
     email: 'john.doe@college.edu',
     department: 'Computer Science Engineering',
     contact: '+91 9876543210',
     profilePic: null // Will be null if no profile picture is uploaded
-  };
+  });
 
   const openModal = (modalType) => {
     setModals(prev => ({
@@ -54,6 +56,17 @@ const UserProfile = () => {
     closeModal('reporting');
   };
 
+  const handleEditProfile = (profileData) => {
+    console.log('User profile update data:', profileData);
+    // TODO: Implement user profile update API call
+    setUserData(prevData => ({
+      ...prevData,
+      ...profileData
+    }));
+    alert('Profile updated successfully! (Frontend only)');
+    closeModal('editProfile');
+  };
+
   const handleProfilePicChange = () => {
     // TODO: Implement profile picture upload
     const input = document.createElement('input');
@@ -71,7 +84,7 @@ const UserProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+    <div className="min-h-screen bg-white py-8">
       <div className="container mx-auto px-4 flex flex-col items-center">
         {/* Page Header */}
         <div className="mb-8 text-center">
@@ -88,6 +101,7 @@ const UserProfile = () => {
             onFeedback={() => openModal('feedback')}
             onReporting={() => openModal('reporting')}
             onProfilePicChange={handleProfilePicChange}
+            onEditProfile={() => openModal('editProfile')}
           />
         </div>
 
@@ -110,6 +124,14 @@ const UserProfile = () => {
           onClose={() => closeModal('reporting')}
           onSubmit={handleReporting}
           type="reporting"
+        />
+
+        <EditProfileModal
+          isOpen={modals.editProfile}
+          onClose={() => closeModal('editProfile')}
+          onSubmit={handleEditProfile}
+          userData={userData}
+          userType="user"
         />
       </div>
     </div>
