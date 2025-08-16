@@ -107,12 +107,14 @@ exports.createBooking = async (req, res) => {
         const immediateConflict = await Booking.findOne({ auditorium: auditorium, status: 'approved', startTime: { $lt: validatedEndTime }, endTime: { $gt: validatedStartTime } });
         if (immediateConflict) { return res.status(409).json({ success: false, message: `The requested time slot conflicts with an existing approved booking (${immediateConflict.eventName}).` }); }
 
-        if (req.file) {
-            uploadedBlobUrl = await uploadToAzure(req.file.buffer, req.file.originalname, req.file.mimetype);
-            console.log(`[Create Booking] Azure upload successful. URL: ${uploadedBlobUrl}`);
-        } else { console.log("[Create Booking] No file uploaded."); }
 
-        const booking = new Booking({ eventName: eventName.trim(), description: description.trim(), startTime: validatedStartTime, endTime: validatedEndTime, auditorium: auditorium, department: department, user: userId, eventImages: uploadedBlobUrl ? [uploadedBlobUrl] : [], status: 'pending' });
+        let eventImages = [];
+        if (req.file) {
+            // Store path relative to /uploads/events/
+            eventImages.push(`/uploads/events/${req.file.filename}`);
+        }
+
+        const booking = new Booking({ eventName: eventName.trim(), description: description.trim(), startTime: validatedStartTime, endTime: validatedEndTime, auditorium: auditorium, department: department, user: userId, eventImages: eventImages, status: 'pending' });
         await booking.save();
         const populatedBooking = await Booking.findById(booking._id).populate('user', 'email username').populate('auditorium', 'name location').populate('department', 'name');
         if (!populatedBooking) { throw new Error("Booking created but failed to retrieve details."); }

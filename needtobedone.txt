@@ -1,20 +1,20 @@
-# profile section
+# profile section(pending   )
 
 # admin should be notified if the event request is in pending when no time left (5 days left ) // pop up on home page 
 
-# events should be booked only two months prior from current date -done 
+# events should be booked only two months prior from current date -(pending)
 
-# updating auditoriums list  , pages should not be static -done
+# updating auditoriums list  , pages should not be static -done(ui need to be done)
 
-# user management by admin --done
+# user management by admin --done(delete user should be implemented)
 
 # admin should be holding autority to cancel the event even if the event is running right now (such as traiings)
 
-# remove bg color for rejected events \
+# remove bg color for rejected events 
 
-#   add redirecting link to logo
+# dynamically should add departments(optional)
 
-# pages should load from top if tehyre opened from footer links 
+# pages should load from top if tehyre opened from footer links or any other redirects
 
 # review section need to contain data from the user reviews including images , fedback
 

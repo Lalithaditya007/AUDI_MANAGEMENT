@@ -28,6 +28,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Serve uploads folder statically for image preview
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // --- Mount API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/auditoriums', auditoriumRoutes);

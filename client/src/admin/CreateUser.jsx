@@ -429,7 +429,7 @@ const CreateUser = () => {
         </div>
 
         {/* Instructions Card */}
-        <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-lg">
+        {/* <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-lg">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -457,7 +457,7 @@ const CreateUser = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

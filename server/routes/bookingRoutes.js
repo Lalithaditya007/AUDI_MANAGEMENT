@@ -1,8 +1,7 @@
 // server/routes/bookingRoutes.js
 const express = require('express');
 const path = require('path'); // Path is still potentially useful, keep it for now
-const multer = require('multer');
-// Removed fs requirement as we don't create local dirs anymore
+const upload = require('../multerConfig');
 
 // Import controller functions - Ensure all required functions are listed
 const {
@@ -30,29 +29,12 @@ const { protect, admin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// --- Multer Config ---
-// Change to memoryStorage to handle file buffer in memory
-const storage = multer.memoryStorage();
 
-const fileFilter = (req, file, cb) => {
-    // Keep the file type filter
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (allowedTypes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        // Use a more specific error message for the global error handler
-        cb(new Error('Invalid file type. Only JPEG, PNG, and GIF allowed.'), false);
-    }
-};
-
-const upload = multer({
-    storage: storage, // Use memoryStorage
-    fileFilter: fileFilter,
-    limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit (keep the limit)
-        files: 1 // Still limit to one file
-    }
-});
+// Middleware to set uploadType for event images
+function setEventUploadType(req, res, next) {
+    req.uploadType = 'events';
+    next();
+}
 
 
 // --- Route Definitions ---
@@ -62,7 +44,7 @@ router.get('/public/events', getPublicEvents);
 
 // POST /api/bookings/ (Create Booking - User, uses multer)
 router.route('/')
-    .post(protect, upload.single('eventPoster'), createBooking); // 'eventPoster' is the field name in the form
+    .post(protect, setEventUploadType, upload.single('eventPoster'), createBooking); // 'eventPoster' is the field name in the form
 
 // GET /api/bookings/mybookings (Get User's Bookings - User)
 router.route('/mybookings')
