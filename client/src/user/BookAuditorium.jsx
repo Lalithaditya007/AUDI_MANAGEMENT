@@ -1,3 +1,4 @@
+import UserNavbar from "./Usernavbar";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from 'react-toastify';
@@ -425,7 +426,8 @@ function BookAuditorium({ userEmail = "" }) {
   // --- Render Component UI ---
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 py-10 sm:py-16 px-4 sm:px-6 lg:px-8">
+      <UserNavbar />
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 py-10 sm:py-16 px-4 sm:px-6 lg:px-8 pt-8">
         <ToastContainer
           position="top-right"
           autoClose={5000}

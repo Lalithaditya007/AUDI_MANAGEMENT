@@ -2,22 +2,24 @@ import React, { useState } from 'react';
 import ProfileCard from '../components/profile/ProfileCard';
 import PasswordChangeModal from '../components/profile/PasswordChangeModal';
 import FeedbackModal from '../components/profile/FeedbackModal';
+import EditProfileModal from '../components/profile/EditProfileModal';
 
 const AdminProfile = () => {
   const [modals, setModals] = useState({
     passwordChange: false,
     feedback: false,
-    reporting: false
+    reporting: false,
+    editProfile: false
   });
 
   // Mock admin data - replace with actual admin data from context/props
-  const adminData = {
+  const [adminData, setAdminData] = useState({
     name: 'Dr. Sarah Johnson',
     email: 'sarah.johnson@college.edu',
     department: 'Administration',
     contact: '+91 9876543210',
     profilePic: null // Will be null if no profile picture is uploaded
-  };
+  });
 
   const openModal = (modalType) => {
     setModals(prev => ({
@@ -54,6 +56,17 @@ const AdminProfile = () => {
     closeModal('reporting');
   };
 
+  const handleEditProfile = (profileData) => {
+    console.log('Admin profile update data:', profileData);
+    // TODO: Implement admin profile update API call
+    setAdminData(prevData => ({
+      ...prevData,
+      ...profileData
+    }));
+    alert('Profile updated successfully! (Frontend only)');
+    closeModal('editProfile');
+  };
+
   const handleProfilePicChange = () => {
     // TODO: Implement admin profile picture upload
     const input = document.createElement('input');
@@ -71,11 +84,11 @@ const AdminProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+    <div className="min-h-screen bg-white py-8">
       <div className="container mx-auto px-4 flex flex-col items-center">
         {/* Page Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Profile</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 mt-20">Admin Profile</h1>
           <p className="text-gray-600">Manage your administrative account settings</p>
         </div>
 
@@ -88,31 +101,8 @@ const AdminProfile = () => {
             onFeedback={() => openModal('feedback')}
             onReporting={() => openModal('reporting')}
             onProfilePicChange={handleProfilePicChange}
+            onEditProfile={() => openModal('editProfile')}
           />
-        </div>
-
-        {/* Admin-specific Information */}
-        <div className="mt-8 w-full max-w-4xl relative">
-          {/* Glassmorphism background */}
-          <div className="absolute inset-0 bg-white/30 backdrop-blur-xl border border-white/40 rounded-2xl shadow-2xl"></div>
-          {/* Content */}
-          <div className="relative z-10 p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Admin Privileges</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <h3 className="font-medium text-blue-800 mb-2">User Management</h3>
-                <p className="text-sm text-gray-600">Create, edit, and manage user accounts</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <h3 className="font-medium text-green-800 mb-2">Booking Management</h3>
-                <p className="text-sm text-gray-600">Approve, reject, and modify bookings</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <h3 className="font-medium text-purple-800 mb-2">System Control</h3>
-                <p className="text-sm text-gray-600">Access to system settings and configurations</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Modals */}
@@ -134,6 +124,14 @@ const AdminProfile = () => {
           onClose={() => closeModal('reporting')}
           onSubmit={handleReporting}
           type="reporting"
+        />
+
+        <EditProfileModal
+          isOpen={modals.editProfile}
+          onClose={() => closeModal('editProfile')}
+          onSubmit={handleEditProfile}
+          userData={adminData}
+          userType="admin"
         />
       </div>
     </div>

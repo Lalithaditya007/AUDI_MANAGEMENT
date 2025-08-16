@@ -112,7 +112,7 @@ const EditAuditorium = () => {
     <div className="min-h-screen flex items-center justify-center bg-[#f7f7f7] px-4 py-10">
       <ToastContainer position="top-center" autoClose={1500} />
       <div className="max-w-xl w-full backdrop-blur-lg bg-white/30 border border-white/40 rounded-2xl shadow-2xl p-8 relative">
-        <h2 className="text-4xl font-extrabold mb-8 text-[#82181A] text-center drop-shadow-lg tracking-tight">Edit Auditorium</h2>
+  <h2 className="text-4xl font-extrabold mb-8 text-[#82181A] text-center drop-shadow-lg tracking-tight mt-20">Edit Auditorium</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <label className="block font-semibold text-[#82181A] drop-shadow">Name</label>

@@ -59,7 +59,7 @@ const ManageAuditoriums = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-[#82181A]">Manage Auditoriums</h1>
+  <h1 className="text-3xl font-bold text-[#82181A] mt-20">Manage Auditoriums</h1>
         <button onClick={() => navigate('/admin/add-auditorium')} className="flex items-center gap-2 px-4 py-2 bg-[#82181A] text-white rounded-lg shadow hover:bg-[#a32c2c] transition">
           <FaPlus /> Add Auditorium
         </button>

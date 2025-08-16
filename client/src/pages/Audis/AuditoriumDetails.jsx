@@ -48,7 +48,7 @@ const AuditoriumDetails = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-12 px-4">
+  <div className="max-w-3xl mx-auto py-12 px-4 mt-20">
       <h1 className="text-4xl font-bold mb-4 text-[#82181A]">{auditorium.name}</h1>
       <div className="mb-6">
         {Array.isArray(auditorium.images) && auditorium.images.length > 0 ? (

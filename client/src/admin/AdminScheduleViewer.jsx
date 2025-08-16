@@ -98,7 +98,7 @@ function AdminScheduleViewer() {
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 sm:mb-0 mt-20">
                         Auditorium Schedule
                     </h1>
                     
