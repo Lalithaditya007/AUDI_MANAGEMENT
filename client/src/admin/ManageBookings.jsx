@@ -58,8 +58,12 @@ const ManageBookings = () => {
   const [rejectReasons, setRejectReasons] = useState({}); // Key: bookingId, Value: reason text
   const [approvingId, setApprovingId] = useState(null); // ID of booking being approved
   const [rejectingId, setRejectingId] = useState(null); // ID of booking being rejected (confirm step)
+  const [endingId, setEndingId] = useState(null); // ID of booking being ended now
   // Removed unused actionSuccess state
   const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null); // ID of booking being cancelled
+  const [cancelReasons, setCancelReasons] = useState({}); // bookingId -> reason
+  const [cancellingBookingId, setCancellingBookingId] = useState(null); // Which booking's cancel input is open
 
   // --- Helpers ---
   // Removed unused showTemporaryFeedback helper
@@ -84,6 +88,15 @@ const ManageBookings = () => {
     const now = new Date();
     const eventStart = new Date(startTime);
     return eventStart < now;
+  };
+
+  /** Determines if an event is currently running (now between start and end). */
+  const isOngoingEvent = (startTime, endTime) => {
+    if (!startTime || !endTime) return false;
+    const now = new Date();
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return start <= now && now < end;
   };
 
   // --- API Fetch Callbacks ---
@@ -425,6 +438,123 @@ const ManageBookings = () => {
     }
   };
 
+  /** Cancels an approved booking with a mandatory reason and emails the user. */
+  const handleConfirmCancel = async (bookingId) => {
+    const reason = cancelReasons[bookingId]?.trim();
+    if (!reason) {
+      showToast('error', 'Cancellation reason is required.');
+      document.getElementById(`cr-${bookingId}`)?.focus();
+      return;
+    }
+
+    if (cancellingId || approvingId || rejectingId) return;
+
+    setCancellingId(bookingId);
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      showToast('error', 'Authentication Error: Please log in again.');
+      setCancellingId(null);
+      return;
+    }
+
+    const url = `${API_BASE_URL}/api/bookings/${bookingId}/cancel`;
+    console.log(`[API Call] Cancelling booking ${bookingId} (PUT ${url}) with reason.`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ cancellationReason: reason })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || `Cancellation failed (Status ${response.status})`);
+      }
+
+      showToast('success', data.message || 'Booking cancelled and user notified.');
+
+      setAllBookings((prev) => prev.map((b) => b._id === bookingId
+        ? { ...b, ...data.data, id: data.data?._id || b.id }
+        : b
+      ));
+
+      // Clear cancel reason after success
+      setCancelReasons((prev) => {
+        const copy = { ...prev };
+        delete copy[bookingId];
+        return copy;
+      });
+  // Collapse the cancel input UI for this booking
+  setCancellingBookingId((prev) => (prev === bookingId ? null : prev));
+    } catch (e) {
+      console.error(`[Error] Cancel booking ${bookingId} failed:`, e);
+      showToast('error', e.message || 'Cancel action failed.');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  /** Toggles the display of the cancellation reason input for a booking. */
+  const handleCancelClick = (bookingId) => {
+    if (approvingId || rejectingId || endingId || cancellingId) return; // avoid overlap
+    setCancellingBookingId((prev) => (prev === bookingId ? null : bookingId));
+    if (cancellingBookingId !== bookingId) {
+      setCancelReasons((prev) => ({ ...prev, [bookingId]: "" }));
+    }
+  };
+
+  /** Updates the cancellation reason state for a specific booking. */
+  const handleCancelReasonChange = (bookingId, value) => {
+    setCancelReasons((prev) => ({ ...prev, [bookingId]: value }));
+  };
+
+  /** Ends an ongoing approved booking immediately by setting end time to now. */
+  const handleEndNow = async (bookingId) => {
+    if (endingId || approvingId || rejectingId) return;
+
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      showToast("error", "Authentication Error: Please log in again.");
+      return;
+    }
+
+    setEndingId(bookingId);
+    const url = `${API_BASE_URL}/api/bookings/${bookingId}/end`;
+    console.log(`[API Call] Ending booking now ${bookingId} (PUT ${url})`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || `Failed to end event (Status ${response.status})`);
+      }
+
+      showToast('success', data.message || 'Event ended successfully.');
+
+      // Update local state with server returned updated booking
+      setAllBookings((prev) => prev.map(b => b._id === bookingId
+        ? { ...b, ...data.data, id: data.data?._id || b.id }
+        : b
+      ));
+
+    } catch (e) {
+      console.error(`[Error] End booking now ${bookingId} failed:`, e);
+      showToast('error', e.message || 'Failed to end event.');
+    } finally {
+      setEndingId(null);
+    }
+  };
+
   // --- Component Render ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
@@ -493,6 +623,7 @@ const ManageBookings = () => {
                 >
                   <option value="all">All Status</option>
                   <option value="approved">Approved</option>
+                  <option value="cancelled">Cancelled</option>
                   <option value="pending">Pending</option>
                   <option value="rejected">Rejected</option>
                 </select>
@@ -674,10 +805,17 @@ const ManageBookings = () => {
                                 <strong className="not-italic font-medium text-red-900">Reason:</strong> {booking.rejectionReason}
                               </div>
                             )}
+                            {/* Cancellation Reason (only if cancelled) */}
+                            {booking.status === "cancelled" && booking.cancellationReason && (
+                              <div className="mt-2 pl-3 border-l-4 border-amber-300 bg-amber-50 text-amber-900 text-xs italic py-1">
+                                <strong className="not-italic font-medium text-amber-900">Cancellation Reason:</strong> {booking.cancellationReason}
+                              </div>
+                            )}
                           </div>
                           {/* --- End Detailed Info --- */}
 
-                          {/* --- Admin Action Area (only for Pending) --- */}
+                          {/* --- Admin Action Area --- */}
+                          {/* Pending: Approve/Reject */}
                           {booking.status === "pending" && (
                             <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
                               {isPastEvent(booking.startTime) ? (
@@ -751,6 +889,74 @@ const ManageBookings = () => {
                                     </button>
                                   </div>
                                 )
+                              )}
+                            </div>
+                          )}
+                          {/* Approved: Cancel Event (always) + End Now (if ongoing) */}
+                          {booking.status === 'approved' && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                              {cancellingBookingId === booking._id ? (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md shadow-sm">
+                                  <label htmlFor={`cr-${booking._id}`} className="block text-sm font-semibold text-amber-800 mb-1.5">
+                                    Reason for Cancellation <span className="text-red-600">*</span>
+                                  </label>
+                                  <textarea
+                                    id={`cr-${booking._id}`}
+                                    className="w-full p-2 border border-amber-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition"
+                                    rows="3"
+                                    value={cancelReasons[booking._id] || ""}
+                                    onChange={(e) => handleCancelReasonChange(booking._id, e.target.value)}
+                                    required
+                                    autoFocus
+                                    disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
+                                  />
+                                  <div className="flex justify-end space-x-2 mt-2">
+                                    <button
+                                      onClick={() => handleConfirmCancel(booking._id)}
+                                      className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                      disabled={!cancelReasons[booking._id]?.trim() || !!(approvingId || rejectingId || endingId) || cancellingId === booking._id}
+                                    >
+                                      {cancellingId === booking._id ? 'Cancelling...' : 'Confirm Cancel'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelClick(booking._id)}
+                                      disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
+                                      className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
+                                    >
+                                      Close
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <button
+                                    onClick={() => handleCancelClick(booking._id)}
+                                    className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                    disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
+                                  >
+                                    Cancel Event
+                                  </button>
+                                  {isOngoingEvent(booking.startTime, booking.endTime) && (
+                                    <button
+                                      onClick={() => handleEndNow(booking._id)}
+                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                      disabled={!!(endingId || approvingId || rejectingId || cancellingId)}
+                                    >
+                                      {endingId === booking._id ? (
+                                        <>
+                                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Ending...
+                                        </>
+                                      ) : (
+                                        'End Now'
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           )}
