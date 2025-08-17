@@ -10,41 +10,43 @@ const AuditoriumPreviewModal = ({ auditorium, onClose }) => {
 		const settings = {
 			dots: true,
 			infinite: true,
-			speed: 350,
+			speed: 500,
 			slidesToShow: 1,
 			slidesToScroll: 1,
 			arrows: true,
 			adaptiveHeight: true,
 			autoplay: true,
-			autoplaySpeed: 1200,
+			autoplaySpeed: 3000,
 		};
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-			<div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative animate-fade-in">
-				<button onClick={onClose} className="absolute top-2 right-2 text-gray-500 hover:text-red-600 text-2xl font-bold">&times;</button>
-				<h2 className="text-2xl font-bold mb-2 text-[#82181A] mt-20">{auditorium.name}</h2>
-				<div className="mb-4 text-gray-700">{auditorium.description}</div>
-				<div className="mb-2"><span className="font-semibold">Capacity:</span> {auditorium.capacity}</div>
-				<div className="mb-2"><span className="font-semibold">Location:</span> {auditorium.location}</div>
-				<div className="mb-2"><span className="font-semibold">Amenities:</span> {Array.isArray(auditorium.amenities) ? auditorium.amenities.join(', ') : auditorium.amenities}</div>
-				<div className="mb-2"><span className="font-semibold">Contact Info:</span> {auditorium.contactInfo}</div>
-				<div className="mb-2"><span className="font-semibold">Size:</span> {auditorium.size}</div>
-				{auditorium.images && auditorium.images.length > 0 && (
-					<div className="mt-4">
-						<Slider {...settings}>
-							{auditorium.images.map((img, idx) => (
-								<div key={idx} className="flex justify-center items-center">
-									<img
-										src={img.startsWith('http') ? img : `${window.location.origin}${img}`}
-										alt={`Auditorium ${idx + 1}`}
-										className="w-full h-56 object-cover rounded-xl border shadow"
-									/>
-								</div>
-							))}
-						</Slider>
-					</div>
-				)}
+							<div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-[6px]">
+									<div className="backdrop-blur-md bg-white/60 rounded-2xl shadow-2xl max-w-xl w-full p-6 relative animate-fade-in flex flex-col gap-2 max-h-[90vh] overflow-y-auto border border-gray-300">
+												<button onClick={onClose} className="absolute top-3 right-4 text-gray-400 hover:text-red-600 text-3xl font-bold transition-all">&times;</button>
+												<h2 className="text-3xl font-extrabold mb-1 text-[#82181A] tracking-tight">{auditorium.name}</h2>
+												<div className="mb-2 text-gray-600 text-base italic">{auditorium.description}</div>
+												<div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 mb-2 text-[1rem]">
+													<div><span className="font-semibold text-gray-700">Capacity:</span> <span className="text-gray-900">{auditorium.capacity}</span></div>
+													<div><span className="font-semibold text-gray-700">Location:</span> <span className="text-gray-900">{auditorium.location}</span></div>
+													<div className="sm:col-span-2"><span className="font-semibold text-gray-700">Amenities:</span> <span className="text-gray-900">{Array.isArray(auditorium.amenities) ? auditorium.amenities.join(', ') : auditorium.amenities}</span></div>
+													<div><span className="font-semibold text-gray-700">Contact Info:</span> <span className="text-gray-900">{auditorium.contactInfo}</span></div>
+													<div><span className="font-semibold text-gray-700">Size:</span> <span className="text-gray-900">{auditorium.size}</span></div>
+												</div>
+												{auditorium.images && auditorium.images.length > 0 && (
+													<div className="mt-2 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+														<Slider {...{...settings, autoplaySpeed: 3000}}>
+															{auditorium.images.map((img, idx) => (
+																<div key={idx} className="flex justify-center items-center">
+																	<img
+																		src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`}
+																		alt={`Auditorium ${idx + 1}`}
+																		className="w-full h-56 object-cover rounded-xl"
+																	/>
+																</div>
+															))}
+														</Slider>
+													</div>
+												)}
 			</div>
 		</div>
 	);

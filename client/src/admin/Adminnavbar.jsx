@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 
 const AdminNavbar = () => {
   return (
-    <nav className="backdrop-blur-md bg-white/20 bg-opacity-60 text-white fixed w-full z-50 top-0 left-0 shadow-lg">
+  <nav className="backdrop-blur-md bg-white/20 bg-opacity-60 text-white fixed w-full z-50 top-0 left-0 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -37,6 +37,10 @@ const AdminNavbar = () => {
               <NavLink to="/admin/reports" className={({isActive}) => 
                 `text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700/70' : ''}`}>
                 Reports
+              </NavLink>
+              <NavLink to="/admin/manage-users" className={({isActive}) => 
+                `text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700/70' : ''}`}>
+                Manage Users
               </NavLink>
               <NavLink to="/admin/create-user" className={({isActive}) => 
                 `text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700/70' : ''}`}>
