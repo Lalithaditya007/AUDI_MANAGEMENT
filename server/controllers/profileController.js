@@ -269,6 +269,9 @@ exports.submitFeedback = async (req, res) => {
             rating,
             anonymous
         } = req.body;
+        const isAnonymous = (typeof anonymous === 'string')
+            ? ['true', '1', 'on', 'yes'].includes(anonymous.toLowerCase())
+            : !!anonymous;
 
         // Map frontend category names to backend enum values
         const feedbackCategoryMapping = {
@@ -316,6 +319,7 @@ exports.submitFeedback = async (req, res) => {
         console.log('💾 Creating feedback record...');
         const feedback = await Feedback.create({
             user: req.user.id,
+            anonymous: isAnonymous,
             type: type,
             subject,
             message,
@@ -325,7 +329,9 @@ exports.submitFeedback = async (req, res) => {
         console.log('✅ Feedback created with ID:', feedback._id);
 
         console.log('📋 Populating user data...');
-        await feedback.populate('user', 'username email profile.firstName profile.lastName');
+    await feedback.populate('user', 'username email profile.firstName profile.lastName');
+    // feedback.anonymous already stored; ensure boolean
+    feedback.anonymous = !!feedback.anonymous;
         console.log('✅ User data populated');
 
         // Send email notification to admin

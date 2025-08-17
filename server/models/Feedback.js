@@ -6,6 +6,10 @@ const FeedbackSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    anonymous: {
+        type: Boolean,
+        default: false,
+    },
     type: {
         type: String,
         enum: ['feedback', 'suggestion', 'complaint', 'appreciation'],

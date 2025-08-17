@@ -1,6 +1,5 @@
-import UserNavbar from "./Usernavbar";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -89,8 +88,7 @@ const showToast = (type, message) => {
 
 // --- Main Booking Component ---
 
-function BookAuditorium({ userEmail = "" }) {
-  const navigate = useNavigate();
+function BookAuditorium() {
   const [searchParams] = useSearchParams();
 
   // --- State Definitions ---
@@ -125,11 +123,7 @@ function BookAuditorium({ userEmail = "" }) {
   const [conflictingBookingDetails, setConflictingBookingDetails] = useState(null);
 
   // --- Helper: Show temporary feedback ---
-  const showTemporaryFeedback = (setter, message, duration = 5000) => {
-    setter(message);
-    const timer = setTimeout(() => setter(""), duration);
-    return () => clearTimeout(timer);
-  };
+  // removed unused showTemporaryFeedback helper
 
   // --- Data Fetching Callbacks ---
   const fetchAuditoriums = useCallback(async () => {
@@ -139,7 +133,7 @@ function BookAuditorium({ userEmail = "" }) {
     console.log("[API Call] Fetching auditoriums from:", apiUrl);
     try {
       const response = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) { let errorMsg = `Auditorium fetch failed (${response.status})`; try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch (e) { /* ignore */ } throw new Error(errorMsg); }
+  if (!response.ok) { let errorMsg = `Auditorium fetch failed (${response.status})`; try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch { /* ignore */ } throw new Error(errorMsg); }
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) { setAuditoriums(data.data); }
       else { throw new Error(data.message || "Invalid format received for auditoriums."); }
@@ -154,7 +148,7 @@ function BookAuditorium({ userEmail = "" }) {
     console.log("[API Call] Fetching departments from:", apiUrl);
     try {
       const response = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) { let errorMsg = `Department fetch failed (${response.status})`; try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch (e) { /* ignore */ } throw new Error(errorMsg); }
+  if (!response.ok) { let errorMsg = `Department fetch failed (${response.status})`; try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch { /* ignore */ } throw new Error(errorMsg); }
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) { setDepartments(data.data); }
       else { throw new Error(data.message || "Invalid format received for departments."); }
@@ -443,8 +437,6 @@ function BookAuditorium({ userEmail = "" }) {
 
   // --- Render Component UI ---
   return (
-    <>
-      <UserNavbar />
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 py-10 sm:py-16 px-4 sm:px-6 lg:px-8 pt-8">
         <ToastContainer
           position="top-right"
@@ -752,8 +744,7 @@ function BookAuditorium({ userEmail = "" }) {
             {/* End Form Element */}
           </div>
         </div>
-      </div>
-    </>
+  </div>
   );
 }
 

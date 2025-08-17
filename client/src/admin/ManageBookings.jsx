@@ -65,6 +65,10 @@ const ManageBookings = () => {
   const [cancelReasons, setCancelReasons] = useState({}); // bookingId -> reason
   const [cancellingBookingId, setCancellingBookingId] = useState(null); // Which booking's cancel input is open
 
+  // Pagination State
+  const PAGE_SIZE = 10; // show 10 events per page
+  const [currentPage, setCurrentPage] = useState(1);
+
   // --- Helpers ---
   // Removed unused showTemporaryFeedback helper
 
@@ -271,12 +275,22 @@ const ManageBookings = () => {
     });
 
     setFilteredBookings(filtered);
+    // Reset to first page whenever filters/data change
+    setCurrentPage(1);
     console.log("[Filtering Admin] Filter results:", {
       total: filtered.length,
       pending: filtered.filter(b => b.status === 'pending').length,
       pendingCurrent: filtered.filter(b => b.status === 'pending' && !isPastEvent(b.startTime)).length
     });
   }, [allBookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]);
+
+  // Clamp current page if filtered results shrink
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredBookings, currentPage]);
 
   // --- UI Interaction Handlers ---
 
@@ -703,272 +717,336 @@ const ManageBookings = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {filteredBookings.map((booking) => {
-                  // Determine image status
-                  const imagePath = booking.eventImages?.[0];
-                  // Construct URL relative to API base URL if path is relative
-                  const fullImageUrl = imagePath
-                    ? imagePath.startsWith('http')
-                      ? imagePath // Assume absolute URL
-                      : `${API_BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}` // Construct full URL
-                    : null;
+                {(() => {
+                  const start = (currentPage - 1) * PAGE_SIZE;
+                  const pageItems = filteredBookings.slice(start, start + PAGE_SIZE);
+                  return pageItems.map((booking) => {
+                    // Determine image status
+                    const imagePath = booking.eventImages?.[0];
+                    // Construct URL relative to API base URL if path is relative
+                    const fullImageUrl = imagePath
+                      ? imagePath.startsWith('http')
+                        ? imagePath // Assume absolute URL
+                        : `${API_BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}` // Construct full URL
+                      : null;
 
-                  const imgHasError = imgErrors[booking._id] || false; // Check specific error state
+                    const imgHasError = imgErrors[booking._id] || false; // Check specific error state
 
-                  // Determine if actions should be disabled
-                  const isAnyActionInProgress = !!(approvingId || rejectingId);
-                  // Disable buttons for THIS booking if its action is processing
-                  // Removed unused disableActionsForThisBooking variable
+                    // Determine if actions should be disabled
+                    const isAnyActionInProgress = !!(approvingId || rejectingId);
 
-                  return (
-                    <div key={booking._id} className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sm:p-6 overflow-hidden hover:shadow-md transition-shadow duration-200">
-                      <div className="flex flex-col md:flex-row gap-5 items-start">
-                        {/* --- Image Area --- */}
-                        <div
-                          className={`flex-shrink-0 w-full md:w-44 h-44 rounded-lg shadow bg-gray-100 flex items-center justify-center overflow-hidden text-gray-400 relative ${fullImageUrl && !imgHasError ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
-                          onClick={() => fullImageUrl && !imgHasError && setZoomedImageUrl(fullImageUrl)}
-                          title={fullImageUrl && !imgHasError ? "Click to zoom poster" : "No poster available or error loading"}
-                        >
-                          {!imgHasError && fullImageUrl ? (
-                            <img
-                              src={fullImageUrl}
-                              alt={`${booking.eventName || "Event"} Poster`}
-                              className="w-full h-full object-cover"
-                              onError={() => {
-                                console.error(`Failed to load image: ${fullImageUrl}`); // Add debug log
-                                handleImageError(booking._id);
-                              }}
-                              loading="lazy" // Improve performance
-                            />
-                          ) : imgHasError ? (
-                            <ImageErrorPlaceholder /> // Show error state
-                          ) : (
-                            <ImagePlaceholderIcon /> // Show 'no image' state
-                          )}
-                        </div>
-                        {/* --- End Image Area --- */}
+                    return (
+                      <div key={booking._id} className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sm:p-6 overflow-hidden hover:shadow-md transition-shadow duration-200">
+                        <div className="flex flex-col md:flex-row gap-5 items-start">
+                          {/* --- Image Area --- */}
+                          <div
+                            className="w-full md:w-56 h-40 md:h-48 bg-gray-50 rounded-lg border overflow-hidden flex items-center justify-center cursor-zoom-in"
+                            onClick={() => {
+                              if (fullImageUrl && !imgHasError) setZoomedImageUrl(fullImageUrl);
+                            }}
+                            title={fullImageUrl && !imgHasError ? "Click to zoom poster" : "No poster available or error loading"}
+                          >
+                            {!imgHasError && fullImageUrl ? (
+                              <img
+                                src={fullImageUrl}
+                                alt={`${booking.eventName || 'Event'} Poster`}
+                                className="w-full h-full object-cover"
+                                onError={() => handleImageError(booking._id)}
+                                loading="lazy"
+                              />
+                            ) : imgHasError ? (
+                              <ImageErrorPlaceholder />
+                            ) : (
+                              <ImagePlaceholderIcon />
+                            )}
+                          </div>
+                          {/* --- End Image Area --- */}
 
-                        {/* --- Details Area --- */}
-                        <div className="flex-1 min-w-0 space-y-2.5">
-                          {/* Header: Event Name & Status */}
-                          <div className="flex flex-col sm:flex-row justify-between items-start gap-1">
-                            <h2 className="text-xl font-semibold text-gray-800 truncate pr-2" title={booking.eventName}>
-                              {booking.eventName || <span className="italic text-gray-400">Untitled Event</span>}
-                            </h2>
-                            <span
-                              className={`flex-shrink-0 mt-1 sm:mt-0 px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${booking.status === "approved" ? "bg-green-100 text-green-800 border-green-200" :
-                                booking.status === "pending" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
-                                  booking.status === "rejected" ? "bg-red-100 text-red-800 border-red-200" :
-                                    "bg-gray-100 text-gray-800 border-gray-200" // Default/Fallback
+                          {/* --- Details Area --- */}
+                          <div className="flex-1 min-w-0 space-y-2.5">
+                            {/* Header: Event Name & Status */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-1">
+                              <h2 className="text-xl font-semibold text-gray-800 truncate pr-2" title={booking.eventName}>
+                                {booking.eventName || <span className="italic text-gray-400">Untitled Event</span>}
+                              </h2>
+                              <span
+                                className={`flex-shrink-0 mt-1 sm:mt-0 px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${booking.status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' :
+                                  booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                  booking.status === 'rejected' ? 'bg-red-100 text-red-800 border-red-200' :
+                                  'bg-gray-100 text-gray-800 border-gray-200'
                                 }`}
-                            >
-                              {booking.status?.toUpperCase() || "N/A"}
-                            </span>
-                          </div>
+                              >
+                                {booking.status?.toUpperCase() || 'N/A'}
+                              </span>
+                            </div>
 
-                          {/* Description */}
-                          <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
-                            {booking.description || <span className="italic text-gray-400">No description provided.</span>}
-                          </p>
-
-                          {/* Detailed Info */}
-                          <div className="text-xs sm:text-sm text-gray-500 space-y-1.5 border-t border-gray-100 pt-2.5 mt-2.5">
-                            <p>
-                              <strong className="font-medium text-gray-700 w-20 inline-block">User:</strong>
-                              {booking.user?.username ?? booking.user?.email ?? <span className="italic">N/A</span>}
-                            </p>
-                            <p>
-                              <strong className="font-medium text-gray-700 w-20 inline-block">Email:</strong>
-                              {booking.user?.email ?? <span className="italic">N/A</span>}
-                            </p>
-                            <p>
-                              <strong className="font-medium text-gray-700 w-20 inline-block">Dept:</strong>
-                              {booking.department?.name ?? <span className="italic text-gray-400">N/A</span>}
-                              {booking.department?.code && ` (${booking.department.code})`}
-                            </p>
-                            <p>
-                              <strong className="font-medium text-gray-700 w-20 inline-block">Auditorium:</strong>
-                              {booking.auditorium?.name ?? <span className="italic">N/A</span>}
-                            </p>
-                            <p>
-                              <strong className="font-medium text-gray-700 w-20 inline-block">From:</strong>
-                              {booking.startTime ? format(parseISO(booking.startTime), 'MMM d, yyyy h:mm a') : "N/A"}
-                            </p>
-                            <p>
-                              <strong className="font-medium text-gray-700 w-20 inline-block">To:</strong>
-                              {booking.endTime ? format(parseISO(booking.endTime), 'MMM d, yyyy h:mm a') : "N/A"}
+                            {/* Description */}
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                              {booking.description || <span className="italic text-gray-400">No description provided.</span>}
                             </p>
 
-                            {/* Rejection Reason (only if rejected) */}
-                            {booking.status === "rejected" && booking.rejectionReason && (
-                              <div className="mt-2 pl-3 border-l-4 border-red-300 bg-red-50 text-red-800 text-xs italic py-1">
-                                <strong className="not-italic font-medium text-red-900">Reason:</strong> {booking.rejectionReason}
-                              </div>
-                            )}
-                            {/* Cancellation Reason (only if cancelled) */}
-                            {booking.status === "cancelled" && booking.cancellationReason && (
-                              <div className="mt-2 pl-3 border-l-4 border-amber-300 bg-amber-50 text-amber-900 text-xs italic py-1">
-                                <strong className="not-italic font-medium text-amber-900">Cancellation Reason:</strong> {booking.cancellationReason}
-                              </div>
-                            )}
-                          </div>
-                          {/* --- End Detailed Info --- */}
+                            {/* Detailed Info */}
+                            <div className="text-xs sm:text-sm text-gray-500 space-y-1.5 border-t border-gray-100 pt-2.5 mt-2.5">
+                              <p>
+                                <strong className="font-medium text-gray-700 w-20 inline-block">User:</strong>
+                                {booking.user?.username ?? booking.user?.email ?? <span className="italic">N/A</span>}
+                              </p>
+                              <p>
+                                <strong className="font-medium text-gray-700 w-20 inline-block">Email:</strong>
+                                {booking.user?.email ?? <span className="italic">N/A</span>}
+                              </p>
+                              <p>
+                                <strong className="font-medium text-gray-700 w-20 inline-block">Dept:</strong>
+                                {booking.department?.name ?? <span className="italic text-gray-400">N/A</span>}
+                                {booking.department?.code && ` (${booking.department.code})`}
+                              </p>
+                              <p>
+                                <strong className="font-medium text-gray-700 w-20 inline-block">Auditorium:</strong>
+                                {booking.auditorium?.name ?? <span className="italic">N/A</span>}
+                              </p>
+                              <p>
+                                <strong className="font-medium text-gray-700 w-20 inline-block">From:</strong>
+                                {booking.startTime ? format(parseISO(booking.startTime), 'MMM d, yyyy h:mm a') : 'N/A'}
+                              </p>
+                              <p>
+                                <strong className="font-medium text-gray-700 w-20 inline-block">To:</strong>
+                                {booking.endTime ? format(parseISO(booking.endTime), 'MMM d, yyyy h:mm a') : 'N/A'}
+                              </p>
 
-                          {/* --- Admin Action Area --- */}
-                          {/* Pending: Approve/Reject */}
-                          {booking.status === "pending" && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                              {isPastEvent(booking.startTime) ? (
-                                // Show message for past pending bookings
-                                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                                  Event deadline has passed - No action required
+                              {/* Rejection Reason (only if rejected) */}
+                              {booking.status === 'rejected' && booking.rejectionReason && (
+                                <div className="mt-2 pl-3 border-l-4 border-red-300 bg-red-50 text-red-800 text-xs italic py-1">
+                                  <strong className="not-italic font-medium text-red-900">Reason:</strong> {booking.rejectionReason}
                                 </div>
-                              ) : (
-                                // Show action buttons only for future/current pending bookings
-                                rejectingBookingId === booking._id ? (
-                                  // Reject reason input section
-                                  <div className="p-3 bg-red-50 border border-red-200 rounded-md shadow-sm">
-                                    <label htmlFor={`rr-${booking._id}`} className="block text-sm font-semibold text-red-800 mb-1.5">
-                                      Reason for Rejection <span className="text-red-600">*</span>
+                              )}
+                              {/* Cancellation Reason (only if cancelled) */}
+                              {booking.status === 'cancelled' && booking.cancellationReason && (
+                                <div className="mt-2 pl-3 border-l-4 border-amber-300 bg-amber-50 text-amber-900 text-xs italic py-1">
+                                  <strong className="not-italic font-medium text-amber-900">Cancellation Reason:</strong> {booking.cancellationReason}
+                                </div>
+                              )}
+                            </div>
+                            {/* --- End Detailed Info --- */}
+
+                            {/* --- Admin Action Area --- */}
+                            {/* Pending: Approve/Reject */}
+                            {booking.status === 'pending' && (
+                              <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                                {isPastEvent(booking.startTime) ? (
+                                  // Show message for past pending bookings
+                                  <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                                    Event deadline has passed - No action required
+                                  </div>
+                                ) : (
+                                  // Show action buttons only for future/current pending bookings
+                                  rejectingBookingId === booking._id ? (
+                                    // Reject reason input section
+                                    <div className="p-3 bg-red-50 border border-red-200 rounded-md shadow-sm">
+                                      <label htmlFor={`rr-${booking._id}`} className="block text-sm font-semibold text-red-800 mb-1.5">
+                                        Reason for Rejection <span className="text-red-600">*</span>
+                                      </label>
+                                      <textarea
+                                        id={`rr-${booking._id}`}
+                                        className="w-full p-2 border border-red-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition"
+                                        rows="3"
+                                        value={rejectReasons[booking._id] || ''}
+                                        onChange={(e) => handleReasonChange(booking._id, e.target.value)}
+                                        required
+                                        autoFocus
+                                        disabled={isAnyActionInProgress}
+                                        aria-describedby={`reason-error-${booking._id}`}
+                                      />
+                                      <div className="flex justify-end space-x-2 mt-2">
+                                        <button
+                                          onClick={() => handleConfirmReject(booking._id)}
+                                          className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                          disabled={!rejectReasons[booking._id]?.trim() || isAnyActionInProgress || rejectingId === booking._id}
+                                        >
+                                          {rejectingId === booking._id ? 'Rejecting...' : 'Confirm Reject'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRejectClick(booking._id)}
+                                          disabled={isAnyActionInProgress}
+                                          className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    // Default approve/reject buttons
+                                    <div className="flex flex-wrap items-center gap-3">
+                                      <button
+                                        onClick={() => handleApprove(booking._id)}
+                                        className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                        disabled={isAnyActionInProgress}
+                                      >
+                                        {approvingId === booking._id ? (
+                                          <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Approving...
+                                          </>
+                                        ) : (
+                                          'Approve'
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => handleRejectClick(booking._id)}
+                                        className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                        disabled={isAnyActionInProgress}
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            )}
+                            {/* Approved: Cancel Event (always) + End Now (if ongoing) */}
+                            {booking.status === 'approved' && (
+                              <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                                {cancellingBookingId === booking._id ? (
+                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md shadow-sm">
+                                    <label htmlFor={`cr-${booking._id}`} className="block text-sm font-semibold text-amber-800 mb-1.5">
+                                      Reason for Cancellation <span className="text-red-600">*</span>
                                     </label>
                                     <textarea
-                                      id={`rr-${booking._id}`}
-                                      className="w-full p-2 border border-red-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition"
+                                      id={`cr-${booking._id}`}
+                                      className="w-full p-2 border border-amber-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition"
                                       rows="3"
-                                      value={rejectReasons[booking._id] || ""}
-                                      onChange={(e) => handleReasonChange(booking._id, e.target.value)}
+                                      value={cancelReasons[booking._id] || ''}
+                                      onChange={(e) => handleCancelReasonChange(booking._id, e.target.value)}
                                       required
                                       autoFocus
-                                      disabled={isAnyActionInProgress}
-                                      aria-describedby={`reason-error-${booking._id}`}
+                                      disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
                                     />
                                     <div className="flex justify-end space-x-2 mt-2">
                                       <button
-                                        onClick={() => handleConfirmReject(booking._id)}
-                                        className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                        disabled={!rejectReasons[booking._id]?.trim() || isAnyActionInProgress || rejectingId === booking._id}
+                                        onClick={() => handleConfirmCancel(booking._id)}
+                                        className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                        disabled={!cancelReasons[booking._id]?.trim() || !!(approvingId || rejectingId || endingId) || cancellingId === booking._id}
                                       >
-                                        {rejectingId === booking._id ? "Rejecting..." : "Confirm Reject"}
+                                        {cancellingId === booking._id ? 'Cancelling...' : 'Confirm Cancel'}
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => handleRejectClick(booking._id)}
-                                        disabled={isAnyActionInProgress}
+                                        onClick={() => handleCancelClick(booking._id)}
+                                        disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
                                         className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
                                       >
-                                        Cancel
+                                        Close
                                       </button>
                                     </div>
                                   </div>
                                 ) : (
-                                  // Default approve/reject buttons
                                   <div className="flex flex-wrap items-center gap-3">
                                     <button
-                                      onClick={() => handleApprove(booking._id)}
-                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                      disabled={isAnyActionInProgress}
-                                    >
-                                      {approvingId === booking._id ? (
-                                        <>
-                                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                          </svg>
-                                          Approving...
-                                        </>
-                                      ) : (
-                                        "Approve"
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => handleRejectClick(booking._id)}
-                                      className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                      disabled={isAnyActionInProgress}
-                                    >
-                                      Reject
-                                    </button>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          )}
-                          {/* Approved: Cancel Event (always) + End Now (if ongoing) */}
-                          {booking.status === 'approved' && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                              {cancellingBookingId === booking._id ? (
-                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md shadow-sm">
-                                  <label htmlFor={`cr-${booking._id}`} className="block text-sm font-semibold text-amber-800 mb-1.5">
-                                    Reason for Cancellation <span className="text-red-600">*</span>
-                                  </label>
-                                  <textarea
-                                    id={`cr-${booking._id}`}
-                                    className="w-full p-2 border border-amber-300 rounded-md text-sm shadow-sm disabled:bg-gray-100 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition"
-                                    rows="3"
-                                    value={cancelReasons[booking._id] || ""}
-                                    onChange={(e) => handleCancelReasonChange(booking._id, e.target.value)}
-                                    required
-                                    autoFocus
-                                    disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
-                                  />
-                                  <div className="flex justify-end space-x-2 mt-2">
-                                    <button
-                                      onClick={() => handleConfirmCancel(booking._id)}
-                                      className="px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                      disabled={!cancelReasons[booking._id]?.trim() || !!(approvingId || rejectingId || endingId) || cancellingId === booking._id}
-                                    >
-                                      {cancellingId === booking._id ? 'Cancelling...' : 'Confirm Cancel'}
-                                    </button>
-                                    <button
-                                      type="button"
                                       onClick={() => handleCancelClick(booking._id)}
-                                      disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
-                                      className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition"
-                                    >
-                                      Close
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <button
-                                    onClick={() => handleCancelClick(booking._id)}
-                                    className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                    disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
-                                  >
-                                    Cancel Event
-                                  </button>
-                                  {isOngoingEvent(booking.startTime, booking.endTime) && (
-                                    <button
-                                      onClick={() => handleEndNow(booking._id)}
                                       className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                                      disabled={!!(endingId || approvingId || rejectingId || cancellingId)}
+                                      disabled={!!(approvingId || rejectingId || endingId || cancellingId)}
                                     >
-                                      {endingId === booking._id ? (
-                                        <>
-                                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                          </svg>
-                                          Ending...
-                                        </>
-                                      ) : (
-                                        'End Now'
-                                      )}
+                                      Cancel Event
                                     </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {/* --- End Admin Action Area --- */}
+                                    {isOngoingEvent(booking.startTime, booking.endTime) && (
+                                      <button
+                                        onClick={() => handleEndNow(booking._id)}
+                                        className="px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                                        disabled={!!(endingId || approvingId || rejectingId || cancellingId)}
+                                      >
+                                        {endingId === booking._id ? (
+                                          <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Ending...
+                                          </>
+                                        ) : (
+                                          'End Now'
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {/* --- End Admin Action Area --- */}
 
+                          </div>
+                          {/* --- End Details Area --- */}
                         </div>
-                        {/* --- End Details Area --- */}
                       </div>
+                    );
+                  });
+                })()}
+
+                {/* --- Pagination Controls --- */}
+                {filteredBookings.length > 0 && (
+                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    {/* Showing range */}
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+                        const endIdx = Math.min(filteredBookings.length, currentPage * PAGE_SIZE);
+                        return (
+                          <span>
+                            Showing <strong>{startIdx}</strong>–<strong>{endIdx}</strong> of <strong>{filteredBookings.length}</strong>
+                          </span>
+                        );
+                      })()}
                     </div>
-                  ); // End return for map
-                })} {/* End .map() */}
-              </div> // End Booking List Container
+
+                    {/* Pager */}
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        disabled={currentPage === 1}
+                        onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        Previous
+                      </button>
+                      {(() => {
+                        const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+                        const pages = [];
+                        // Render up to 5 page buttons centered around current
+                        const span = 2;
+                        const start = Math.max(1, currentPage - span);
+                        const end = Math.min(totalPages, currentPage + span);
+                        if (start > 1) pages.push(1);
+                        if (start > 2) pages.push('ellipsis-start');
+                        for (let p = start; p <= end; p++) pages.push(p);
+                        if (end < totalPages - 1) pages.push('ellipsis-end');
+                        if (end < totalPages) pages.push(totalPages);
+                        return pages.map((p, idx) =>
+                          typeof p === 'number' ? (
+                            <button
+                              key={idx}
+                              className={`px-3 py-1.5 text-sm rounded border ${p === currentPage ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+                              onClick={() => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                            >
+                              {p}
+                            </button>
+                          ) : (
+                            <span key={idx} className="px-2 text-gray-400">…</span>
+                          )
+                        );
+                      })()}
+                      <button
+                        className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        disabled={currentPage >= Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE))}
+                        onClick={() => { setCurrentPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* --- End Pagination Controls --- */}
+              </div>
             )}
             {/* --- End Booking List / No Results --- */}
           </>
@@ -1002,8 +1080,8 @@ const ManageBookings = () => {
         )}
         {/* --- End Zoom Modal --- */}
 
-      </div> {/* End Page Container */}
-    </div> // End Main Div
+      </div>
+    </div>
   );
 };
 
