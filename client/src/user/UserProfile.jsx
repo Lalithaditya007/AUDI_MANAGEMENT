@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ProfileCard from '../components/profile/ProfileCard';
+import ProfileStats from '../components/profile/ProfileStats';
+import ProfileActivity from '../components/profile/ProfileActivity';
 import PasswordChangeModal from '../components/profile/PasswordChangeModal';
 import FeedbackModal from '../components/profile/FeedbackModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
@@ -19,6 +21,8 @@ const UserProfile = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [myBookings, setMyBookings] = useState([]);
+  const [stats, setStats] = useState({ total: 0, upcoming: 0, pending: 0, cancelled: 0 });
 
   // Toast notification function
   const showToast = (type, message) => {
@@ -46,6 +50,21 @@ const UserProfile = () => {
       } else {
         setError('Failed to load profile data');
       }
+      // Also try to load user's bookings for stats from booking history endpoint
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+          const res = await fetch(`${apiBase}/api/bookings/mybookings`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+          const data = await res.json();
+          if (res.ok && data.success && Array.isArray(data.data)) {
+            setMyBookings(data.data);
+          }
+        }
+      } catch (e) {
+        // Non-blocking for profile
+        console.warn('Failed loading user bookings for stats:', e);
+      }
     } catch (error) {
       console.error('Error loading profile:', error);
       setError(error.message || 'Failed to load profile data');
@@ -53,6 +72,20 @@ const UserProfile = () => {
       setLoading(false);
     }
   };
+
+  // Derive stats when bookings change
+  useEffect(() => {
+    if (!Array.isArray(myBookings)) return;
+    const now = new Date();
+    let total = myBookings.length;
+    let pending = 0, cancelled = 0, upcoming = 0;
+    for (const b of myBookings) {
+      if (b.status === 'pending') pending++;
+      if (b.status === 'cancelled') cancelled++;
+      if (b.status === 'approved' && b.startTime && new Date(b.startTime) > now) upcoming++;
+    }
+    setStats({ total, upcoming, pending, cancelled });
+  }, [myBookings]);
 
   const openModal = (modalType) => {
     setModals(prev => ({
@@ -158,12 +191,24 @@ const UserProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white py-8">
-      <div className="container mx-auto px-4 flex flex-col items-center">
+    <div className="min-h-screen bg-gradient-to-br from-red-100 via-red-50 to-red-200 py-10 sm:py-16 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex flex-col items-stretch w-full max-w-6xl">
         {/* Page Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">My Profile</h1>
-          <p className="text-gray-600">Manage your account settings and preferences</p>
+        <div className="w-full max-w-5xl mx-auto mb-8">
+          <div className="rounded-2xl bg-gradient-to-r from-red-700 to-red-800 text-white p-6 md:p-8 shadow-lg ring-1 ring-black/10">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-red-100/90">Account</p>
+                <h1 className="text-2xl md:text-3xl font-semibold">My Profile</h1>
+                <p className="text-red-100 mt-1">Manage your account settings and preferences</p>
+              </div>
+              {userData?.email && (
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 text-sm text-red-50 border border-white/20">
+                  {userData.email}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Loading State */}
@@ -191,7 +236,11 @@ const UserProfile = () => {
 
         {/* Profile Card */}
         {!loading && !error && userData && (
-          <div className="w-full max-w-4xl">
+          <div className="w-full max-w-5xl mx-auto space-y-6">
+            {/* Stats Strip */}
+            <ProfileStats stats={stats} />
+
+            {/* Profile Card */}
             <ProfileCard
               userType="user"
               userData={{
@@ -209,6 +258,9 @@ const UserProfile = () => {
               onProfilePicChange={handleProfilePicChange}
               onEditProfile={() => openModal('editProfile')}
             />
+
+            {/* Recent Activity */}
+            <ProfileActivity items={myBookings.slice(0, 5)} />
           </div>
         )}
 
