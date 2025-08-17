@@ -1,11 +1,6 @@
-
-
 # events should be booked only two months prior from current date -(pending)
-
 # updating auditoriums list  , pages should not be static -done(ui need to be done)
-
 # user management by admin --done(delete user should be implemented)
-
 # admin should be holding autority to cancel the event even if the event is running right now (such as traiings)
 # remove bg color for rejected events 
 # dynamically should add departments(optional)
