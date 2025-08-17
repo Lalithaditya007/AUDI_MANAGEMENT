@@ -89,7 +89,11 @@ const FeedbackModal = ({ isOpen, onClose, onSubmit, type = 'feedback' }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit({ ...formData, type });
+      const { rating, category, subject, message, anonymous } = formData;
+      const payload = isReporting
+        ? { category, subject, message, type }
+        : { rating, category, subject, message, anonymous, type };
+      onSubmit(payload);
       setFormData({
         rating: 0,
         category: '',
@@ -227,20 +231,22 @@ const FeedbackModal = ({ isOpen, onClose, onSubmit, type = 'feedback' }) => {
             )}
           </div>
 
-          {/* Anonymous Option */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="anonymous"
-              name="anonymous"
-              checked={formData.anonymous}
-              onChange={handleChange}
-              className="w-4 h-4 text-blue-400 border-white/30 rounded focus:ring-blue-400 bg-white/20 backdrop-blur-sm"
-            />
-            <label htmlFor="anonymous" className="text-sm text-white/90">
-              Submit anonymously
-            </label>
-          </div>
+          {/* Anonymous Option (feedback only) */}
+          {!isReporting && (
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="anonymous"
+                name="anonymous"
+                checked={formData.anonymous}
+                onChange={handleChange}
+                className="w-4 h-4 text-blue-400 border-white/30 rounded focus:ring-blue-400 bg-white/20 backdrop-blur-sm"
+              />
+              <label htmlFor="anonymous" className="text-sm text-white/90">
+                Submit anonymously
+              </label>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="flex space-x-3 pt-4">

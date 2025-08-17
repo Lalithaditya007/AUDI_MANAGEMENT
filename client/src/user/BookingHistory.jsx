@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
 import { format, parseISO } from 'date-fns';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -32,7 +31,7 @@ function debounce(func, wait) {
 function BookingHistory() {
   const modalStartTimeRef = useRef(null);
   const modalEndTimeRef = useRef(null);
-  const navigate = useNavigate(); // Included navigate
+  // Note: navigate not used in this component
 
   // --- State Definitions ---
   const [bookings, setBookings] = useState([]);
@@ -63,6 +62,10 @@ function BookingHistory() {
   const [isModalSlotAvailable, setIsModalSlotAvailable] = useState(true);
   const [modalConflictDetails, setModalConflictDetails] = useState(null); // Stores conflict info
 
+  // Pagination State
+  const PAGE_SIZE = 10; // show 10 bookings per page
+  const [currentPage, setCurrentPage] = useState(1);
+
   // --- Constants ---
   const bookingLeadTimeHours = 2; // Configurable lead time
 
@@ -85,7 +88,7 @@ function BookingHistory() {
   };
 
   const getMinDateTimeLocalString = useCallback(() => {
-    try { const now = new Date(); const minDate = new Date(now.getTime() + (bookingLeadTimeHours || 2) * 36e5); const localMinDt = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000); return localMinDt.toISOString().slice(0, 16); } catch (e) { const now=new Date(); const localNow=new Date(now.getTime()-now.getTimezoneOffset()*60000); return localNow.toISOString().slice(0,16); }
+    try { const now = new Date(); const minDate = new Date(now.getTime() + (bookingLeadTimeHours || 2) * 36e5); const localMinDt = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000); return localMinDt.toISOString().slice(0, 16); } catch { const now=new Date(); const localNow=new Date(now.getTime()-now.getTimezoneOffset()*60000); return localNow.toISOString().slice(0,16); }
   }, [bookingLeadTimeHours]);
 
   // Add this function to handle time changes
@@ -155,7 +158,7 @@ function BookingHistory() {
         try {
           const d=await res.json();
           m=d.message||m;
-        } catch (e){}
+        } catch { void 0; }
         throw new Error(m);
       }
       const data=await res.json();
@@ -199,14 +202,23 @@ function BookingHistory() {
 
   useEffect(() => { // Filtering Logic
      const filtered = bookings.filter(b => { const lT = searchTerm.toLowerCase(); const sM=!searchTerm || (b.eventName?.toLowerCase().includes(lT)) || (b.description?.toLowerCase().includes(lT)); const stM = filterStatus === "all" || b.status === filterStatus; const aM = filterAuditorium === "all" || b.auditorium?.name === filterAuditorium; const dM = filterDepartment === "all" || b.department?._id === filterDepartment; const dtM = !filterDate || (b.startTime && format(parseISO(b.startTime), 'yyyy-MM-dd') === filterDate); return sM&&stM&&aM&&dM&&dtM; }); setFilteredBookings(filtered);
+     setCurrentPage(1); // reset to first page when filters change
    }, [bookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]);
+
+  // Clamp current page if filtered results shrink
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredBookings, currentPage]);
 
   const debouncedModalCheck = useMemo(() => debounce(checkAvailability, 750), [checkAvailability]); // Debounced check
 
   useEffect(() => { // Trigger Modal Check
      let isActive=true; if (isRescheduleModalOpen && modalStartTime && modalEndTime && rescheduleBooking?._id && rescheduleBooking?.auditorium?._id) {
        try { const start=new Date(modalStartTime), end=new Date(modalEndTime); if (!isNaN(start)&&!isNaN(end)&&start<end) { debouncedModalCheck(modalStartTime, modalEndTime, rescheduleBooking.auditorium._id, rescheduleBooking._id); } else { if (isActive) { setIsModalSlotAvailable(false); setModalConflictDetails(null); setModalAvailabilityError("Valid time required."); setIsCheckingModalAvailability(false); }}}
-       catch(e) { if (isActive) { setIsModalSlotAvailable(false); setModalConflictDetails(null); setModalAvailabilityError("Invalid date format."); setIsCheckingModalAvailability(false); }}}
+  catch { if (isActive) { setIsModalSlotAvailable(false); setModalConflictDetails(null); setModalAvailabilityError("Invalid date format."); setIsCheckingModalAvailability(false); }}}
      else if (isRescheduleModalOpen) { if(isActive) { setIsModalSlotAvailable(true); setModalConflictDetails(null); setModalAvailabilityError(""); setIsCheckingModalAvailability(false); }}
      return () => {isActive=false;};
   }, [modalStartTime, modalEndTime, rescheduleBooking, isRescheduleModalOpen, debouncedModalCheck]);
@@ -226,7 +238,7 @@ function BookingHistory() {
       });
     }
   }, [isModalSlotAvailable, isCheckingModalAvailability, isSubmittingReschedule,
-      modalStartTime, modalEndTime, rescheduleBooking]);
+      modalStartTime, modalEndTime, rescheduleBooking, isRescheduleModalOpen]);
 
   useEffect(() => { return () => { /* Cleanup on unmount */ }; }, []);
 
@@ -404,7 +416,10 @@ function BookingHistory() {
               <div className="text-center py-16"> <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> <h3 className="mt-2 text-sm font-medium text-gray-900">{bookings.length === 0 ? "No bookings found" : "No bookings match filters"}</h3> <p className="mt-1 text-sm text-gray-500">{bookings.length === 0 ? "No requests yet." : "Try adjusting filters."}</p> </div>
              ) : (
               <div className="space-y-6">
-                {filteredBookings.map((booking) => {
+                {(() => {
+                  const start = (currentPage - 1) * PAGE_SIZE;
+                  const pageItems = filteredBookings.slice(start, start + PAGE_SIZE);
+                  return pageItems.map((booking) => {
                     const eventStart = booking.startTime ? parseISO(booking.startTime) : null; const now = new Date(); const minReqTime = new Date(now.getTime()+(bookingLeadTimeHours||2)*36e5); const canWdTime=eventStart&&eventStart>minReqTime; const wdAllowed = booking.status==='pending'||(booking.status==='approved'&&canWdTime); const rsAllowed = booking.status==='approved'&&eventStart&&eventStart>now;
                     
                     // --- CORRECTED IMAGE URL LOGIC ---
@@ -448,7 +463,69 @@ function BookingHistory() {
                             </div>
                         </div>
                     );
-                 })}
+                 });
+                })()}
+
+                {/* Pagination Controls */}
+                {filteredBookings.length > 0 && (
+                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    {/* Showing range */}
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+                        const endIdx = Math.min(filteredBookings.length, currentPage * PAGE_SIZE);
+                        return (
+                          <span>
+                            Showing <strong>{startIdx}</strong>–<strong>{endIdx}</strong> of <strong>{filteredBookings.length}</strong>
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Pager */}
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        disabled={currentPage === 1}
+                        onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        Previous
+                      </button>
+                      {(() => {
+                        const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+                        const pages = [];
+                        const span = 2;
+                        const start = Math.max(1, currentPage - span);
+                        const end = Math.min(totalPages, currentPage + span);
+                        if (start > 1) pages.push(1);
+                        if (start > 2) pages.push('ellipsis-start');
+                        for (let p = start; p <= end; p++) pages.push(p);
+                        if (end < totalPages - 1) pages.push('ellipsis-end');
+                        if (end < totalPages) pages.push(totalPages);
+                        return pages.map((p, idx) =>
+                          typeof p === 'number' ? (
+                            <button
+                              key={idx}
+                              className={`px-3 py-1.5 text-sm rounded border ${p === currentPage ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+                              onClick={() => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                            >
+                              {p}
+                            </button>
+                          ) : (
+                            <span key={idx} className="px-2 text-gray-400">…</span>
+                          )
+                        );
+                      })()}
+                      <button
+                        className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        disabled={currentPage >= Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE))}
+                        onClick={() => { setCurrentPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
              )}
           </>

@@ -21,7 +21,9 @@ const {
     getPublicEvents,
     checkAvailability,
     checkBookingConflicts, // Assuming you added this controller function based on previous context
-    getPendingUpcomingBookings
+    getPendingUpcomingBookings,
+    endBookingNow,
+    cancelBooking
 } = require('../controllers/bookingController'); // Verify this path is correct
 
 // Import middleware
@@ -113,6 +115,14 @@ router.route('/:id/approve')
 // PUT /api/bookings/:id/reject (Reject - Admin)
 router.route('/:id/reject')
     .put(protect, admin, rejectBooking);
+
+// PUT /api/bookings/:id/end (End ongoing event - Admin)
+router.route('/:id/end')
+    .put(protect, admin, endBookingNow);
+
+// PUT /api/bookings/:id/cancel (Cancel approved event with reason - Admin)
+router.route('/:id/cancel')
+    .put(protect, admin, cancelBooking);
 
 
 module.exports = router;

@@ -31,6 +31,6 @@ export default defineConfig({
           "100%": { transform: "translateX(-100%)" },
         },
       },
-    },
-  },
+     },
+ },
 });

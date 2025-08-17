@@ -17,6 +17,7 @@ const {
     sendBookingWithdrawalConfirmationEmail,
     sendRescheduleRequestEmail,
     sendRescheduleRequestNotificationToAdmin,
+    sendBookingCancellationEmail,
     formatDateTimeIST // Assuming this utility exists and works
 } = require('../utils/emailService'); // Verify path
 
@@ -142,7 +143,7 @@ exports.getMyBookings = async (req, res, next) => {
 // --- getAllBookings (Admin) (No changes needed) ---
 exports.getAllBookings = async (req, res, next) => {
     // ... (keep existing implementation) ...
-     try { const query = {}; const filtersApplied = {}; if (req.query.status && ['pending', 'approved', 'rejected'].includes(req.query.status.toLowerCase())) { query.status = req.query.status.toLowerCase(); filtersApplied.status = query.status; } if (req.query.auditoriumId && mongoose.Types.ObjectId.isValid(req.query.auditoriumId)) { query.auditorium = req.query.auditoriumId; filtersApplied.auditoriumId = req.query.auditoriumId; } if (req.query.departmentId && mongoose.Types.ObjectId.isValid(req.query.departmentId)) { query.department = req.query.departmentId; filtersApplied.departmentId = req.query.departmentId; } if (req.query.eventName) { query.eventName = { $regex: req.query.eventName, $options: 'i' }; filtersApplied.eventName = req.query.eventName; } if (req.query.userEmail) { const users = await User.find({ email: { $regex: req.query.userEmail, $options: 'i' } }).select('_id'); const userIds = users.map(u => u._id); if (userIds.length === 0) { return res.status(200).json({ success: true, count: 0, filtersApplied, data: [] }); } query.user = { $in: userIds }; filtersApplied.userEmail = req.query.userEmail; } if (req.query.date) { const targetDateIST = DateTime.fromISO(req.query.date, { zone: istTimezone }); if (!targetDateIST.isValid) { return res.status(400).json({ success: false, message: `Invalid date filter format: ${req.query.date}. Use YYYY-MM-DD.` }); } const startOfDayUTC = targetDateIST.startOf('day').toUTC().toJSDate(); const endOfDayUTC = targetDateIST.endOf('day').toUTC().toJSDate(); query.startTime = { $lt: endOfDayUTC }; query.endTime = { $gt: startOfDayUTC }; filtersApplied.date = req.query.date; } const bookings = await Booking.find(query).populate('user', 'username email').populate('auditorium', 'name location').populate('department', 'name code').sort({ createdAt: -1 }); res.status(200).json({ success: true, count: bookings.length, filtersApplied, data: bookings }); } catch (error) { console.error("[Error] Admin getting all bookings failed:", error); res.status(500).json({ success: false, message: 'Server error retrieving bookings.' }); }
+    try { const query = {}; const filtersApplied = {}; if (req.query.status && ['pending', 'approved', 'rejected', 'cancelled'].includes(req.query.status.toLowerCase())) { query.status = req.query.status.toLowerCase(); filtersApplied.status = query.status; } if (req.query.auditoriumId && mongoose.Types.ObjectId.isValid(req.query.auditoriumId)) { query.auditorium = req.query.auditoriumId; filtersApplied.auditoriumId = req.query.auditoriumId; } if (req.query.departmentId && mongoose.Types.ObjectId.isValid(req.query.departmentId)) { query.department = req.query.departmentId; filtersApplied.departmentId = req.query.departmentId; } if (req.query.eventName) { query.eventName = { $regex: req.query.eventName, $options: 'i' }; filtersApplied.eventName = req.query.eventName; } if (req.query.userEmail) { const users = await User.find({ email: { $regex: req.query.userEmail, $options: 'i' } }).select('_id'); const userIds = users.map(u => u._id); if (userIds.length === 0) { return res.status(200).json({ success: true, count: 0, filtersApplied, data: [] }); } query.user = { $in: userIds }; filtersApplied.userEmail = req.query.userEmail; } if (req.query.date) { const targetDateIST = DateTime.fromISO(req.query.date, { zone: istTimezone }); if (!targetDateIST.isValid) { return res.status(400).json({ success: false, message: `Invalid date filter format: ${req.query.date}. Use YYYY-MM-DD.` }); } const startOfDayUTC = targetDateIST.startOf('day').toUTC().toJSDate(); const endOfDayUTC = targetDateIST.endOf('day').toUTC().toJSDate(); query.startTime = { $lt: endOfDayUTC }; query.endTime = { $gt: startOfDayUTC }; filtersApplied.date = req.query.date; } const bookings = await Booking.find(query).populate('user', 'username email').populate('auditorium', 'name location').populate('department', 'name code').sort({ createdAt: -1 }); res.status(200).json({ success: true, count: bookings.length, filtersApplied, data: bookings }); } catch (error) { console.error("[Error] Admin getting all bookings failed:", error); res.status(500).json({ success: false, message: 'Server error retrieving bookings.' }); }
 };
 
 // --- approveBooking (Admin) (No changes needed) ---
@@ -248,5 +249,122 @@ exports.getPendingUpcomingBookings = async (req, res, next) => {
     } catch (error) {
         console.error("[Error] Fetching pending upcoming bookings failed:", error);
         res.status(500).json({ success: false, message: 'Server error retrieving pending upcoming bookings.' });
+    }
+};
+
+/**
+ * @desc    End an ongoing approved event immediately by setting endTime to now
+ * @route   PUT /api/bookings/:id/end
+ * @access  Private/Admin
+ */
+exports.endBookingNow = async (req, res) => {
+    const bookingId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format.' });
+    }
+
+    try {
+        const booking = await Booking.findById(bookingId)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name')
+            .populate('department', 'name');
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
+        }
+
+        if (booking.status !== 'approved') {
+            return res.status(400).json({ success: false, message: `Only approved bookings can be ended early. Current status: '${booking.status}'.` });
+        }
+
+        const nowIST = DateTime.now().setZone(istTimezone);
+        const startIST = DateTime.fromJSDate(booking.startTime).setZone(istTimezone);
+        const endIST = DateTime.fromJSDate(booking.endTime).setZone(istTimezone);
+
+        if (nowIST < startIST) {
+            return res.status(400).json({ success: false, message: 'Event has not started yet. You can only end an event after it starts.' });
+        }
+        if (nowIST >= endIST) {
+            return res.status(400).json({ success: false, message: 'Event is already over.' });
+        }
+
+        const previousEndTime = booking.endTime;
+        booking.endTime = nowIST.toUTC().toJSDate();
+        const updated = await booking.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Event ended successfully. End time set to now.',
+            data: updated,
+            meta: { previousEndTime }
+        });
+    } catch (error) {
+        console.error(`[Error] Ending booking ${bookingId} early failed:`, error);
+        return res.status(500).json({ success: false, message: 'Server error ending event.' });
+    }
+};
+
+/**
+ * @desc    Cancel an approved booking (admin action) with a required reason; notifies the user by email
+ * @route   PUT /api/bookings/:id/cancel
+ * @access  Private/Admin
+ */
+exports.cancelBooking = async (req, res) => {
+    const bookingId = req.params.id;
+    const { cancellationReason } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format.' });
+    }
+    if (!cancellationReason || !cancellationReason.trim()) {
+        return res.status(400).json({ success: false, message: 'Cancellation reason is required.' });
+    }
+
+    try {
+        const booking = await Booking.findById(bookingId)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name location')
+            .populate('department', 'name');
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
+        }
+        if (booking.status !== 'approved') {
+            return res.status(400).json({ success: false, message: `Only approved bookings can be cancelled. Current status: '${booking.status}'.` });
+        }
+
+        booking.status = 'cancelled';
+        booking.cancellationReason = cancellationReason.trim();
+        const updated = await booking.save();
+
+        // Repopulate to guarantee fields for email (some ORMs drop population on save)
+        const updatedPopulated = await Booking.findById(updated._id)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name location')
+            .populate('department', 'name');
+
+        // Email the user about cancellation
+        try {
+            const userEmail = updatedPopulated?.user?.email;
+            if (userEmail) {
+                console.log(`[Email] Sending cancellation email for booking ${updated._id} to ${userEmail}`);
+                await sendBookingCancellationEmail(
+                    userEmail,
+                    updatedPopulated,
+                    updatedPopulated.auditorium,
+                    updatedPopulated.department,
+                    updatedPopulated.cancellationReason
+                );
+                console.log(`[Email] Cancellation email dispatched for booking ${updated._id}`);
+            } else {
+                console.warn(`[Email Skipped] User email missing for booking ${updated._id} cancellation.`);
+            }
+        } catch (emailError) {
+            console.error(`[Non-critical Error] Sending cancellation email failed for booking ${updated._id}:`, emailError);
+        }
+
+        return res.status(200).json({ success: true, message: 'Booking cancelled successfully.', data: updated });
+    } catch (error) {
+        console.error(`[Error] Cancelling booking ${bookingId} failed:`, error);
+        return res.status(500).json({ success: false, message: 'Server error cancelling booking.' });
     }
 };
