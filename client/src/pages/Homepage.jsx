@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Events from '../components/Events.jsx';
 import clg from '../assets/clg.jpg';
 import ksaudi from '../assets/ksaudi/ksaudi1.jpg'; // A fallback image
@@ -7,7 +8,7 @@ import { motion } from 'motion/react';
 // The 'Link' component from 'react-router-dom' was imported but not used. It's good practice to remove unused imports, but it's not an error.
 
 // This component fetches and displays the first 3 auditoriums from your API
-function FeaturedAuditoriums() {
+function FeaturedAuditoriums({ isLoggedIn, userRole }) {
   const [auditoriums, setAuditoriums] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,10 +69,23 @@ function FeaturedAuditoriums() {
           </div>
           <div className="p-6">
             <p className="text-gray-600 mb-4">{auditorium.description}</p>
-            <a href={`/auditorium/${auditorium._id}`} className="text-red-600 font-medium flex items-center group-hover:text-red-700">
-              View Details
-              <svg className="w-4 h-4 ml-2 transform transition-transform group-hover:translate-x-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-            </a>
+            <div className="flex flex-col gap-3">
+              <Link to={`/auditorium/${auditorium._id}`} className="text-red-600 font-medium flex items-center group-hover:text-red-700">
+                View Details
+                <svg className="w-4 h-4 ml-2 transform transition-transform group-hover:translate-x-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+              </Link>
+              {auditorium.available && isLoggedIn && userRole === 'user' && (
+                <Link 
+                  to={`/book-auditorium?auditorium=${auditorium._id}`}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white text-sm rounded-lg font-medium hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-105"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Book Now
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -107,26 +121,32 @@ const HomePage = ({ isLoggedIn, userRole }) => {
             {/* CTA Buttons */}
             <div className="flex flex-wrap gap-4 justify-center mt-8">
               <div className="flex flex-col items-center">
-                <motion.a
+                <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  href="/auditoriums"
-                  className="px-8 py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-300"
                 >
-                  Explore Auditoriums
-                </motion.a>
+                  <Link
+                    to="/auditoriums"
+                    className="px-8 py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-300"
+                  >
+                    Explore Auditoriums
+                  </Link>
+                </motion.div>
                 {/* ...existing code... */}
               </div>
               {/* Conditional "Book Now" Button */}
               {!(isLoggedIn && userRole === 'admin') && (
-                <motion.a
+                <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  href={isLoggedIn ? "/book-auditorium" : "/login"}
-                  className="px-8 py-3 bg-white/10 backdrop-blur-sm text-white rounded-full font-semibold hover:bg-white/20 transition-colors duration-300 border border-white/30"
                 >
-                  Book Now
-                </motion.a>
+                  <Link
+                    to={isLoggedIn ? "/book-auditorium" : "/login"}
+                    className="px-8 py-3 bg-white/10 backdrop-blur-sm text-white rounded-full font-semibold hover:bg-white/20 transition-colors duration-300 border border-white/30"
+                  >
+                    Book Now
+                  </Link>
+                </motion.div>
               )}
             </div>
           </div>
@@ -179,10 +199,10 @@ const HomePage = ({ isLoggedIn, userRole }) => {
               </motion.div>
             </div>
             <motion.div className="text-center mt-12" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }} viewport={{ once: true }}>
-              <a href="/login" className="inline-flex items-center px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors">
+              <Link to="/login" className="inline-flex items-center px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors">
                 Get Started
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
-              </a>
+              </Link>
             </motion.div>
           </div>
         </section>
@@ -197,9 +217,14 @@ const HomePage = ({ isLoggedIn, userRole }) => {
             <motion.div initial={{ width: 0 }} whileInView={{ width: "100px" }} transition={{ duration: 0.8, delay: 0.2 }} className="h-1 bg-red-400 mx-auto rounded-full mt-4" />
           </div>
           {/* This component now handles its own data fetching */}
-          <FeaturedAuditoriums />
+          <FeaturedAuditoriums isLoggedIn={isLoggedIn} userRole={userRole} />
           <div className="text-center mt-12">
-            <motion.a initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.6 }} viewport={{ once: true }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} href="/auditoriums" className="inline-flex items-center px-6 py-3 border-2 border-red-600 text-red-600 font-medium rounded-lg hover:bg-red-600 hover:text-white transition-colors"> View All Auditoriums <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg> </motion.a>
+            <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.6 }} viewport={{ once: true }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Link to="/auditoriums" className="inline-flex items-center px-6 py-3 border-2 border-red-600 text-red-600 font-medium rounded-lg hover:bg-red-600 hover:text-white transition-colors">
+                View All Auditoriums 
+                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+              </Link>
+            </motion.div>
           </div>
         </div>
       </section>

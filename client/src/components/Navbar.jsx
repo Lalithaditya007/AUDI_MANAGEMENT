@@ -38,21 +38,21 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
             <nav className={`fixed top-0 left-0 right-0 p-4 shadow-md z-50 bg-white transition-all duration-300`}>
                 <div className="container mx-auto flex items-center justify-between">
                     <div className="flex items-center">
-                        <a href="/">
+                        <NavLink to="/">
                             <img
                                 src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
                                 alt="VNR VJIET Symbol"
                                 className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0"
                             />
-                        </a>
-                        <a href="/">
+                        </NavLink>
+                        <NavLink to="/">
                         <div className="ml-2">
                             <h1 className="text-lg sm:text-xl font-bold text-red-900 leading-tight">
                                 Vallurupalli Nageswara Rao <br className="hidden sm:inline" />Vignana Jyothi Institute
                             </h1>
                             <p className="text-xs sm:text-sm text-red-900">Vignana Jyothi Nagar, Hyderabad</p>
                         </div>
-                        </a>
+                        </NavLink>
                     </div>
                     {/* Hamburger for mobile */}
                     <button

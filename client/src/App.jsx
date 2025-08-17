@@ -22,6 +22,7 @@ import AddAuditorium from "./pages/Audis/AddAuditorium";
 import AdminProfile from "./admin/AdminProfile";
 import UserProfile from "./user/UserProfile";
 import AuthDebug from "./components/AuthDebug";
+import ScrollToTop from "./components/ScrollToTop";
 
 
 function AppContent() {
@@ -35,6 +36,7 @@ function AppContent() {
 
     return (
         <div className="flex flex-col min-h-screen">
+            <ScrollToTop />
             <Navbar isLoggedIn={isLoggedIn} userRole={userRole} setIsLoggedIn={setIsLoggedIn} setUserRole={setUserRole} setUserEmail={setUserEmail} />
             <main className="flex-grow">
                 <Routes>
@@ -42,8 +44,8 @@ function AppContent() {
                     {/* --- MODIFIED LINE BELOW --- */}
                     <Route path="/" element={<Homepage isLoggedIn={isLoggedIn} userRole={userRole} />} />
                     {/* --- END MODIFICATION --- */}
-                    <Route path="/auditoriums" element={<Auditoriums />} />
-                    <Route path="/auditorium/:id" element={<AuditoriumDetails />} />
+                    <Route path="/auditoriums" element={<Auditoriums isLoggedIn={isLoggedIn} userRole={userRole} />} />
+                    <Route path="/auditorium/:id" element={<AuditoriumDetails isLoggedIn={isLoggedIn} userRole={userRole} />} />
                     <Route path="/ks-auditorium" element={<KSAudi />} />
                     <Route path="/b-block-seminar-hall" element={<BBlockSeminarHall />} />
                     <Route path="/auditoriums/b-block" element={<BBlockSeminarHall />} />

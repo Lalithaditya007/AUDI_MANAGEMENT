@@ -1,6 +1,4 @@
-# profile section(pending)
 
-# admin should be notified if the event request is in pending when no time left (5 days left ) // pop up on home page 
 
 # events should be booked only two months prior from current date -(pending)
 
@@ -9,29 +7,11 @@
 # user management by admin --done(delete user should be implemented)
 
 # admin should be holding autority to cancel the event even if the event is running right now (such as traiings)
-
 # remove bg color for rejected events 
-
 # dynamically should add departments(optional)
-
-# pages should load from top if tehyre opened from footer links or any other redirects
-
-# review section need to contain data from the user reviews including images , fedback()
-
 # add student chapters  / department checkbox input while booking and use the respective input box
 # update event timings in user booing history , if it is a multi day event 
 #  dispay events list (along with images ) based on the given date , year 
-# change social media handle in the fooer 
-
-# enable booking directly from  auditoriums pages , that auditorium name is passed as paramter for the booking page 
-
 # carousel in auditorium pages should have buttons to slide , inclusing auto sliding , 
-
-# book now buttons should not be shown to the admin 
-
-# hide how booking works section when admin logs in 
-
-# pie charts in admin dashboard should not get any the black box on click 
-
 # check for responsivess of the website 
 
