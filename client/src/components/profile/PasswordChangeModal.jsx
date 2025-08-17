@@ -59,15 +59,17 @@ const PasswordChangeModal = ({ isOpen, onClose, onSubmit }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      onSubmit(formData);
-      setFormData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
+    if (!validateForm()) return;
+
+    // Ask parent to submit; expect { success: boolean, errors?: { field: message } }
+    const result = await onSubmit(formData);
+    if (result && result.success) {
+      setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setErrors({});
+    } else if (result && result.errors) {
+      setErrors(result.errors);
     }
   };
 

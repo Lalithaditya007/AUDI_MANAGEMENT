@@ -285,9 +285,12 @@ exports.sendFeedbackNotificationToAdmin = async (adminEmail, feedbackDetails) =>
         const feedbackType = feedbackDetails.type || 'feedback';
         const subject = feedbackDetails.subject || 'N/A';
         const message = feedbackDetails.message || 'N/A';
-        const userEmail = feedbackDetails.user?.email || 'N/A';
-        const userName = feedbackDetails.user?.username || 'N/A';
-        const userFullName = `${feedbackDetails.user?.profile?.firstName || ''} ${feedbackDetails.user?.profile?.lastName || ''}`.trim() || userName;
+        const isAnonymous = !!feedbackDetails.anonymous;
+        const userEmail = isAnonymous ? 'Anonymous' : (feedbackDetails.user?.email || 'N/A');
+        const userName = isAnonymous ? 'Anonymous' : (feedbackDetails.user?.username || 'N/A');
+        const userFullName = isAnonymous
+            ? 'Anonymous'
+            : (`${feedbackDetails.user?.profile?.firstName || ''} ${feedbackDetails.user?.profile?.lastName || ''}`.trim() || userName);
         const attachmentCount = feedbackDetails.attachments?.length || 0;
 
         const emailSubject = `💬 New Feedback Submitted: ${subject}`;
@@ -309,11 +312,11 @@ exports.sendFeedbackNotificationToAdmin = async (adminEmail, feedbackDetails) =>
                     </table>
                 </div>
                 <div style="background: #e8eaf6; padding: 15px; border-left: 4px solid #3f51b5; border-radius: 4px; margin: 20px 0;">
-                    <h2 style="color: #3f51b5; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">User Information</h2>
+                    <h2 style="color: #3f51b5; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">${isAnonymous ? 'Submitter' : 'User'} Information</h2>
                     <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-                        <tr><td style="padding: 6px 0; width: 130px;"><strong>Name:</strong></td><td style="padding: 6px 0;">${userFullName}</td></tr>
-                        <tr><td style="padding: 6px 0;"><strong>Username:</strong></td><td style="padding: 6px 0;">${userName}</td></tr>
-                        <tr><td style="padding: 6px 0;"><strong>Email:</strong></td><td style="padding: 6px 0;">${userEmail}</td></tr>
+                        <tr><td style="padding: 6px 0; width: 130px;"><strong>${isAnonymous ? 'Submitted By' : 'Name'}:</strong></td><td style="padding: 6px 0;">${userFullName}</td></tr>
+                        ${isAnonymous ? '' : `<tr><td style=\"padding: 6px 0;\"><strong>Username:</strong></td><td style=\"padding: 6px 0;\">${userName}</td></tr>`}
+                        ${isAnonymous ? '' : `<tr><td style=\"padding: 6px 0;\"><strong>Email:</strong></td><td style=\"padding: 6px 0;\">${userEmail}</td></tr>`}
                     </table>
                 </div>
                 <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; border: 1px solid #ffc371;">

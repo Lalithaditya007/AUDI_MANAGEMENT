@@ -103,19 +103,33 @@ const UserProfile = () => {
 
   const handlePasswordChange = async (passwordData) => {
     try {
-      console.log('Password change request data:', passwordData);
       const response = await profileAPI.changePassword(passwordData);
-      console.log('Password change response:', response);
       if (response.success) {
         showToast('success', 'Password changed successfully!');
         closeModal('passwordChange');
-      } else {
-        console.error('Password change failed:', response);
-        showToast('error', response.message || 'Failed to change password');
+        return { success: true };
       }
+      // Map generic failure to field errors if possible
+      return {
+        success: false,
+        errors: {
+          currentPassword: response.message || 'Failed to change password'
+        }
+      };
     } catch (error) {
-      console.error('Password change error:', error);
-      showToast('error', error.message || 'Error changing password');
+      // Try to infer specific errors
+      const msg = error.message || 'Error changing password';
+      let fieldErrors = {};
+      if (/incorrect/i.test(msg)) {
+        fieldErrors.currentPassword = 'Current password is incorrect';
+      } else if (/match/i.test(msg)) {
+        fieldErrors.confirmPassword = 'Passwords do not match';
+      } else if (/least\s*6/i.test(msg)) {
+        fieldErrors.newPassword = 'Password must be at least 6 characters';
+      } else {
+        fieldErrors.currentPassword = msg;
+      }
+      return { success: false, errors: fieldErrors };
     }
   };
 
@@ -190,6 +204,50 @@ const UserProfile = () => {
     input.click();
   };
 
+  // Inline edit handler for per-field quick updates (called with newValue from inline input)
+  const handleInlineEdit = async (field, newValue) => {
+    try {
+      const trimmed = (newValue || '').trim();
+      if (!trimmed) {
+        showToast('error', 'Value cannot be empty');
+        return false;
+      }
+
+      // Map field to payload accepted by backend
+      let payload = {};
+      if (field === 'name') {
+        const parts = trimmed.split(/\s+/);
+        payload.firstName = parts[0] || '';
+        payload.lastName = parts.slice(1).join(' ') || '';
+      } else if (field === 'department') {
+        payload.department = trimmed;
+      } else if (field === 'contact') {
+        payload.contact = trimmed;
+      } else if (field === 'email') {
+        // Backend doesn't support updating email here; show toast and keep editor open
+        showToast('error', 'Email changes are not supported here. Use the Edit Profile form.');
+        return false;
+      } else {
+        showToast('error', 'Unsupported field');
+        return false;
+      }
+
+      const response = await profileAPI.updateProfile(payload);
+      if (response.success) {
+        setUserData(response.data);
+        showToast('success', 'Updated successfully');
+        return true;
+      } else {
+        showToast('error', response.message || 'Failed to update');
+        return false;
+      }
+    } catch (error) {
+      console.error('Inline update error:', error);
+      showToast('error', error.message || 'Error updating');
+      return false;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-100 via-red-50 to-red-200 py-10 sm:py-16 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto flex flex-col items-stretch w-full max-w-6xl">
@@ -257,6 +315,7 @@ const UserProfile = () => {
               onReporting={() => openModal('reporting')}
               onProfilePicChange={handleProfilePicChange}
               onEditProfile={() => openModal('editProfile')}
+              onInlineEdit={handleInlineEdit}
             />
 
             {/* Recent Activity */}
