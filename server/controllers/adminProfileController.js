@@ -2,6 +2,83 @@ const Feedback = require('../models/Feedback');
 const Report = require('../models/Report');
 const User = require('../models/User');
 
+// Get admin dashboard summary statistics
+exports.getAdminDashboardStats = async (req, res) => {
+    try {
+        console.log('=== ADMIN DASHBOARD STATS REQUEST ===');
+        
+        // Get feedback counts
+        const totalFeedback = await Feedback.countDocuments();
+        const pendingFeedback = await Feedback.countDocuments({ status: 'pending' });
+        const unreadFeedback = await Feedback.countDocuments({ 
+            status: 'pending',
+            'adminResponse.respondedBy': { $exists: false }
+        });
+        
+        // Get report counts
+        const totalReports = await Report.countDocuments();
+        const pendingReports = await Report.countDocuments({ status: 'pending' });
+        const urgentReports = await Report.countDocuments({ 
+            status: { $in: ['pending', 'investigating'] },
+            severity: { $in: ['high', 'critical'] }
+        });
+        
+        // Get recent feedback (last 5)
+        const recentFeedback = await Feedback.find()
+            .populate('user', 'username profile.firstName profile.lastName')
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .select('subject type status createdAt user');
+            
+        // Get recent reports (last 5)
+        const recentReports = await Report.find()
+            .populate('reporter', 'username profile.firstName profile.lastName')
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .select('subject reportType severity status createdAt reporter');
+
+        const stats = {
+            feedback: {
+                total: totalFeedback,
+                pending: pendingFeedback,
+                unread: unreadFeedback,
+                recent: recentFeedback
+            },
+            reports: {
+                total: totalReports,
+                pending: pendingReports,
+                urgent: urgentReports,
+                recent: recentReports
+            },
+            notifications: {
+                totalUnread: unreadFeedback + pendingReports,
+                feedbackUnread: unreadFeedback,
+                reportsUnread: pendingReports
+            }
+        };
+
+        console.log('✅ Dashboard stats calculated:', {
+            totalFeedback,
+            pendingFeedback,
+            unreadFeedback,
+            totalReports,
+            pendingReports,
+            urgentReports
+        });
+
+        res.status(200).json({
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        console.error('❌ Get admin dashboard stats error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching dashboard statistics'
+        });
+    }
+};
+
 // Get all feedback (Admin only)
 exports.getAllFeedback = async (req, res) => {
     try {
@@ -9,14 +86,12 @@ exports.getAllFeedback = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const status = req.query.status;
         const type = req.query.type;
-        const priority = req.query.priority;
         const skip = (page - 1) * limit;
 
         // Build filter object
         const filter = {};
         if (status) filter.status = status;
         if (type) filter.type = type;
-        if (priority) filter.priority = priority;
 
         const feedbacks = await Feedback.find(filter)
             .populate('user', 'username email profile.firstName profile.lastName')

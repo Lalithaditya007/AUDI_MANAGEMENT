@@ -23,11 +23,6 @@ const FeedbackSchema = new mongoose.Schema({
         trim: true,
         maxlength: 1000,
     },
-    priority: {
-        type: String,
-        enum: ['low', 'medium', 'high', 'urgent'],
-        default: 'medium',
-    },
     status: {
         type: String,
         enum: ['pending', 'in-progress', 'resolved', 'closed'],

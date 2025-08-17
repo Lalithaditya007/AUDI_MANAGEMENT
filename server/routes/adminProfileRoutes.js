@@ -10,7 +10,8 @@ const {
     addAdminNote,
     updateReportStatus,
     resolveReport,
-    getDashboardStats
+    getDashboardStats,
+    getAdminDashboardStats
 } = require('../controllers/adminProfileController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -27,6 +28,7 @@ const adminOnly = (req, res, next) => {
 
 // Dashboard statistics
 router.get('/dashboard-stats', authMiddleware.protect, adminOnly, getDashboardStats);
+router.get('/admin-dashboard-stats', authMiddleware.protect, adminOnly, getAdminDashboardStats);
 
 // Feedback management routes
 router.get('/feedback', authMiddleware.protect, adminOnly, getAllFeedback);

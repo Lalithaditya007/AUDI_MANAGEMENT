@@ -221,6 +221,190 @@ exports.sendPendingReminderEmailToAdmin = async (adminEmail, bookingDetails, aud
   }
 };
 
+// --- NEW: Send Feedback Notification to Admin ---
+/**
+ * Sends a notification email to the admin when a user submits feedback.
+ * @param {string} adminEmail - The admin's email address.
+ * @param {object} feedbackDetails - The feedback document with user populated.
+ * @returns {Promise<object | void>} Resolves with Nodemailer info object on success, or void on failure.
+ */
+exports.sendFeedbackNotificationToAdmin = async (adminEmail, feedbackDetails) => {
+    const feedbackId = feedbackDetails?._id || 'N/A';
+    console.log(`[Email Service] Preparing to send FEEDBACK NOTIFICATION for Feedback ID: ${feedbackId} to ${adminEmail}`);
+
+    try {
+        // --- Input Validation ---
+        if (!adminEmail) throw new Error('Admin email is missing for feedback notification.');
+        if (!feedbackDetails?._id || !feedbackDetails.subject || !feedbackDetails.message) throw new Error('Incomplete feedback details provided for notification.');
+        if (!feedbackDetails.user?.email || !feedbackDetails.user?.username) console.warn(`[Email Service WARN] User email or username missing for feedback ${feedbackId} notification.`);
+
+        // --- Prepare Email Content ---
+        const partialFeedbackId = feedbackDetails._id.toString().slice(-6);
+        const submittedAt = formatDateTimeIST(feedbackDetails.createdAt);
+        const feedbackType = feedbackDetails.type || 'feedback';
+        const subject = feedbackDetails.subject || 'N/A';
+        const message = feedbackDetails.message || 'N/A';
+        const userEmail = feedbackDetails.user?.email || 'N/A';
+        const userName = feedbackDetails.user?.username || 'N/A';
+        const userFullName = `${feedbackDetails.user?.profile?.firstName || ''} ${feedbackDetails.user?.profile?.lastName || ''}`.trim() || userName;
+        const attachmentCount = feedbackDetails.attachments?.length || 0;
+
+        const emailSubject = `💬 New Feedback Submitted: ${subject}`;
+
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 8px;">
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <h1 style="color: #3b82f6; margin: 0; font-size: 24px;">New Feedback Received</h1>
+                    <p style="color: #666; margin-top: 5px;">A user has submitted feedback that requires your attention</p>
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #3b82f6; border-radius: 4px; margin: 20px 0;">
+                    <h2 style="color: #3b82f6; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Feedback Details</h2>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <tr><td style="padding: 6px 0; width: 130px; vertical-align: top;"><strong>Subject:</strong></td><td style="padding: 6px 0; vertical-align: top;">${subject}</td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Type:</strong></td><td style="padding: 6px 0; vertical-align: top; text-transform: capitalize;">${feedbackType}</td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Submitted:</strong></td><td style="padding: 6px 0; vertical-align: top;">${submittedAt}</td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Feedback ID:</strong></td><td style="padding: 6px 0; vertical-align: top;">...${partialFeedbackId}</td></tr>
+                        ${attachmentCount > 0 ? `<tr><td style="padding: 6px 0; vertical-align: top;"><strong>Attachments:</strong></td><td style="padding: 6px 0; vertical-align: top;">${attachmentCount} file(s)</td></tr>` : ''}
+                    </table>
+                </div>
+                <div style="background: #e8eaf6; padding: 15px; border-left: 4px solid #3f51b5; border-radius: 4px; margin: 20px 0;">
+                    <h2 style="color: #3f51b5; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">User Information</h2>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <tr><td style="padding: 6px 0; width: 130px;"><strong>Name:</strong></td><td style="padding: 6px 0;">${userFullName}</td></tr>
+                        <tr><td style="padding: 6px 0;"><strong>Username:</strong></td><td style="padding: 6px 0;">${userName}</td></tr>
+                        <tr><td style="padding: 6px 0;"><strong>Email:</strong></td><td style="padding: 6px 0;">${userEmail}</td></tr>
+                    </table>
+                </div>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; border: 1px solid #ffc371;">
+                    <h3 style="color: #856404; margin-top: 0; margin-bottom: 10px;">Message:</h3>
+                    <p style="color: #856404; margin: 0; line-height: 1.5; white-space: pre-wrap;">${message}</p>
+                </div>
+                <div style="margin-top: 30px; text-align: center;">
+                    <p style="color: #666;">Please log in to the admin dashboard to review and respond to this feedback.</p>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px; font-size: 0.8em; color: #aaa;">
+                This is an automated notification from the Auditorium Management System.<br>
+                Please do not reply to this email.
+            </div>
+        `;
+
+        console.log(`[Email Service] Calling sendEmail for FEEDBACK NOTIFICATION - Feedback ID: ${feedbackId}`);
+        const info = await sendEmail(adminEmail, emailSubject, htmlContent);
+        console.log(`[Email Service] Successfully sent feedback notification for Feedback ID: ${feedbackId}`);
+
+        return info;
+
+    } catch (error) {
+        console.error(`[Email Service Error] Failed sending FEEDBACK NOTIFICATION email for feedback ${feedbackId} to ${adminEmail}:`, error.message || error);
+        return;
+    }
+};
+
+// --- NEW: Send Report Notification to Admin ---
+/**
+ * Sends a notification email to the admin when a user submits a report.
+ * @param {string} adminEmail - The admin's email address.
+ * @param {object} reportDetails - The report document with user populated.
+ * @returns {Promise<object | void>} Resolves with Nodemailer info object on success, or void on failure.
+ */
+exports.sendReportNotificationToAdmin = async (adminEmail, reportDetails) => {
+    const reportId = reportDetails?._id || 'N/A';
+    console.log(`[Email Service] Preparing to send REPORT NOTIFICATION for Report ID: ${reportId} to ${adminEmail}`);
+
+    try {
+        // --- Input Validation ---
+        if (!adminEmail) throw new Error('Admin email is missing for report notification.');
+        if (!reportDetails?._id || !reportDetails.subject || !reportDetails.description) throw new Error('Incomplete report details provided for notification.');
+        if (!reportDetails.reporter?.email || !reportDetails.reporter?.username) console.warn(`[Email Service WARN] Reporter email or username missing for report ${reportId} notification.`);
+
+        // --- Prepare Email Content ---
+        const partialReportId = reportDetails._id.toString().slice(-6);
+        const submittedAt = formatDateTimeIST(reportDetails.createdAt);
+        const reportType = reportDetails.reportType || 'other';
+        const severity = reportDetails.severity || 'medium';
+        const subject = reportDetails.subject || 'N/A';
+        const description = reportDetails.description || 'N/A';
+        const reporterEmail = reportDetails.reporter?.email || 'N/A';
+        const reporterName = reportDetails.reporter?.username || 'N/A';
+        const reporterFullName = `${reportDetails.reporter?.profile?.firstName || ''} ${reportDetails.reporter?.profile?.lastName || ''}`.trim() || reporterName;
+        const evidenceCount = reportDetails.evidence?.length || 0;
+
+        // Severity color mapping
+        const severityColors = {
+            low: '#22c55e',
+            medium: '#f59e0b',
+            high: '#ef4444',
+            critical: '#dc2626'
+        };
+        const severityColor = severityColors[severity] || '#f59e0b';
+
+        // Report type display mapping
+        const reportTypeDisplay = {
+            'abuse': 'Abuse',
+            'inappropriate_content': 'Inappropriate Content',
+            'technical_issue': 'Technical Issue',
+            'policy_violation': 'Policy Violation',
+            'harassment': 'Harassment',
+            'spam': 'Spam',
+            'other': 'Other'
+        };
+        const displayType = reportTypeDisplay[reportType] || reportType;
+
+        const emailSubject = `🚨 New Report Submitted: ${subject}`;
+
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 8px;">
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <h1 style="color: #dc2626; margin: 0; font-size: 24px;">New Report Submitted</h1>
+                    <p style="color: #666; margin-top: 5px;">A user has submitted a report that requires immediate attention</p>
+                </div>
+                <div style="background: #fef2f2; padding: 15px; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
+                    <h2 style="color: #dc2626; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Report Details</h2>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <tr><td style="padding: 6px 0; width: 130px; vertical-align: top;"><strong>Subject:</strong></td><td style="padding: 6px 0; vertical-align: top;">${subject}</td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Type:</strong></td><td style="padding: 6px 0; vertical-align: top;">${displayType}</td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Severity:</strong></td><td style="padding: 6px 0; vertical-align: top;"><span style="color: ${severityColor}; font-weight: bold; text-transform: uppercase;">${severity}</span></td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Submitted:</strong></td><td style="padding: 6px 0; vertical-align: top;">${submittedAt}</td></tr>
+                        <tr><td style="padding: 6px 0; vertical-align: top;"><strong>Report ID:</strong></td><td style="padding: 6px 0; vertical-align: top;">...${partialReportId}</td></tr>
+                        ${evidenceCount > 0 ? `<tr><td style="padding: 6px 0; vertical-align: top;"><strong>Evidence:</strong></td><td style="padding: 6px 0; vertical-align: top;">${evidenceCount} file(s)</td></tr>` : ''}
+                    </table>
+                </div>
+                <div style="background: #e8eaf6; padding: 15px; border-left: 4px solid #3f51b5; border-radius: 4px; margin: 20px 0;">
+                    <h2 style="color: #3f51b5; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Reporter Information</h2>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <tr><td style="padding: 6px 0; width: 130px;"><strong>Name:</strong></td><td style="padding: 6px 0;">${reporterFullName}</td></tr>
+                        <tr><td style="padding: 6px 0;"><strong>Username:</strong></td><td style="padding: 6px 0;">${reporterName}</td></tr>
+                        <tr><td style="padding: 6px 0;"><strong>Email:</strong></td><td style="padding: 6px 0;">${reporterEmail}</td></tr>
+                    </table>
+                </div>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; border: 1px solid #ffc371;">
+                    <h3 style="color: #856404; margin-top: 0; margin-bottom: 10px;">Description:</h3>
+                    <p style="color: #856404; margin: 0; line-height: 1.5; white-space: pre-wrap;">${description}</p>
+                </div>
+                <div style="margin-top: 30px; text-align: center; padding: 15px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 5px;">
+                    <p style="color: #991b1b; font-weight: bold; margin: 0 0 10px 0;">This report requires immediate attention!</p>
+                    <p style="color: #991b1b; margin: 0;">Please log in to the admin dashboard to investigate and take appropriate action.</p>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px; font-size: 0.8em; color: #aaa;">
+                This is an automated notification from the Auditorium Management System.<br>
+                Please do not reply to this email.
+            </div>
+        `;
+
+        console.log(`[Email Service] Calling sendEmail for REPORT NOTIFICATION - Report ID: ${reportId}`);
+        const info = await sendEmail(adminEmail, emailSubject, htmlContent);
+        console.log(`[Email Service] Successfully sent report notification for Report ID: ${reportId}`);
+
+        return info;
+
+    } catch (error) {
+        console.error(`[Email Service Error] Failed sending REPORT NOTIFICATION email for report ${reportId} to ${adminEmail}:`, error.message || error);
+        return;
+    }
+};
+
 // --- Make sure all previous email functions are still exported ---
 module.exports = {
     sendBookingRequestEmail: exports.sendBookingRequestEmail,
@@ -230,6 +414,8 @@ module.exports = {
     sendBookingWithdrawalConfirmationEmail: exports.sendBookingWithdrawalConfirmationEmail,
     sendRescheduleRequestEmail: exports.sendRescheduleRequestEmail,
     sendRescheduleRequestNotificationToAdmin: exports.sendRescheduleRequestNotificationToAdmin,
-    sendPendingReminderEmailToAdmin: exports.sendPendingReminderEmailToAdmin, // Ensure the new one is exported
+    sendPendingReminderEmailToAdmin: exports.sendPendingReminderEmailToAdmin,
+    sendFeedbackNotificationToAdmin: exports.sendFeedbackNotificationToAdmin, // New function
+    sendReportNotificationToAdmin: exports.sendReportNotificationToAdmin, // New function
     formatDateTimeIST // Export the helper if needed elsewhere
 };

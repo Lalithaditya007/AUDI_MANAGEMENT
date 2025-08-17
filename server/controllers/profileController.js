@@ -4,6 +4,7 @@ const Report = require('../models/Report');
 const bcrypt = require('bcryptjs');
 const fs = require('fs').promises;
 const path = require('path');
+const { sendFeedbackNotificationToAdmin, sendReportNotificationToAdmin } = require('../utils/emailService');
 
 // Get user profile
 exports.getProfile = async (req, res) => {
@@ -265,7 +266,6 @@ exports.submitFeedback = async (req, res) => {
             category,        // Frontend sends 'category', map to type
             subject,
             message,
-            priority,
             rating,
             anonymous
         } = req.body;
@@ -319,7 +319,6 @@ exports.submitFeedback = async (req, res) => {
             type: type,
             subject,
             message,
-            priority: priority || 'medium',
             rating: rating || null,
             attachments
         });
@@ -328,6 +327,21 @@ exports.submitFeedback = async (req, res) => {
         console.log('📋 Populating user data...');
         await feedback.populate('user', 'username email profile.firstName profile.lastName');
         console.log('✅ User data populated');
+
+        // Send email notification to admin
+        try {
+            console.log('📧 Sending feedback notification to admin...');
+            const adminEmail = process.env.ADMIN_EMAIL;
+            if (adminEmail) {
+                await sendFeedbackNotificationToAdmin(adminEmail, feedback);
+                console.log('✅ Admin notification sent successfully');
+            } else {
+                console.warn('⚠️ ADMIN_EMAIL not configured, skipping notification');
+            }
+        } catch (emailError) {
+            console.error('❌ Failed to send admin notification:', emailError.message);
+            // Don't fail the request if email fails, just log it
+        }
 
         res.status(201).json({
             success: true,
@@ -442,6 +456,21 @@ exports.submitReport = async (req, res) => {
         console.log('📋 Populating reporter data...');
         await report.populate('reporter', 'username email profile.firstName profile.lastName');
         console.log('✅ Reporter data populated');
+
+        // Send email notification to admin
+        try {
+            console.log('📧 Sending report notification to admin...');
+            const adminEmail = process.env.ADMIN_EMAIL;
+            if (adminEmail) {
+                await sendReportNotificationToAdmin(adminEmail, report);
+                console.log('✅ Admin notification sent successfully');
+            } else {
+                console.warn('⚠️ ADMIN_EMAIL not configured, skipping notification');
+            }
+        } catch (emailError) {
+            console.error('❌ Failed to send admin notification:', emailError.message);
+            // Don't fail the request if email fails, just log it
+        }
 
         res.status(201).json({
             success: true,
