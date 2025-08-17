@@ -1,4 +1,5 @@
 import EditAuditorium from "./admin/EditAuditorium";
+import ManageUsers from "./admin/ManageUsers";
 import ManageAuditoriums from "./admin/ManageAuditoriums";
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
@@ -85,6 +86,8 @@ function AppContent() {
                     <Route path="/admin/add-auditorium" element={isLoggedIn&&userRole==='admin'?<AddAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/manage-auditoriums" element={isLoggedIn&&userRole==='admin'?<ManageAuditoriums />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/auditoriums/:id" element={isLoggedIn&&userRole==='admin'?<EditAuditorium />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
+
+                    <Route path="/admin/manage-users" element={isLoggedIn&&userRole==='admin'?<ManageUsers />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
                     <Route path="/admin/profile" element={isLoggedIn&&userRole==='admin'?<AdminProfile />:<Navigate to="/login" replace state={{from:location.pathname}}/>} />
 
                     {/* Debug Route - Remove in production */}

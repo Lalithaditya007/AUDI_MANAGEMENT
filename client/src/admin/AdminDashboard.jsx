@@ -188,17 +188,7 @@ const AdminDashboard = () => {
               <span>Manage Users</span>
             </div>
           </button>
-          <button
-            onClick={() => navigate('/admin/create-user')}
-            className="group bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ease-in-out"
-          >
-            <div className="flex items-center justify-center space-x-2">
-              <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span>Create New User</span>
-            </div>
-          </button>
+          {/* Removed Create New User button as requested */}
 
           <button
             onClick={() => navigate('/manage-bookings')}
