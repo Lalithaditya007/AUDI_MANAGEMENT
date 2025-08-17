@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Building, Phone } from 'lucide-react';
 
 const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => {
@@ -10,6 +10,20 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
     bio: userData?.profile?.bio || '',
     position: userData?.profile?.position || ''
   });
+
+  // Sync form fields with userData when modal opens or userData changes
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        firstName: userData?.profile?.firstName || userData?.name?.split(' ')[0] || '',
+        lastName: userData?.profile?.lastName || userData?.name?.split(' ').slice(1).join(' ') || '',
+        department: userData?.profile?.department || userData?.department || '',
+        contact: userData?.profile?.contact || userData?.contact || '',
+        bio: userData?.profile?.bio || '',
+        position: userData?.profile?.position || ''
+      });
+    }
+  }, [isOpen, userData]);
 
   const [errors, setErrors] = useState({});
 
@@ -79,33 +93,31 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-black/40 via-black/30 to-black/40 backdrop-blur-lg flex items-center justify-center z-50 p-4">
-      <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
-        {/* Glassmorphism overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-white/10 to-white/5 rounded-2xl"></div>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-200 relative">
         <div className="relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/30 bg-white/5 backdrop-blur-sm rounded-t-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white rounded-t-2xl">
           <div className="flex items-center space-x-3">
-            <User className="w-6 h-6 text-blue-400" />
-            <h2 className="text-xl font-semibold text-white">
+            <User className="w-7 h-7 text-blue-600" />
+            <h2 className="text-2xl font-bold text-[#82181A] tracking-tight">
               Edit {userType === 'admin' ? 'Admin' : 'User'} Profile
             </h2>
           </div>
           <button 
             onClick={onClose}
-            className="text-white/70 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
+            className="text-gray-500 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
           >
-            <X className="w-6 h-6" />
+            <X className="w-7 h-7" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white/5 backdrop-blur-sm rounded-b-2xl">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-white rounded-b-2xl">
           {/* First Name */}
           <div>
-            <label className="block text-sm font-medium text-white/90 mb-2">
-              <User className="w-4 h-4 inline mr-2" />
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <User className="w-4 h-4 inline mr-2 text-blue-500" />
               First Name
             </label>
             <input
@@ -113,12 +125,12 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               name="firstName"
               value={formData.firstName}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 ${
+              className={`w-full px-2 py-1.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-sm ${
                 errors.firstName ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your first name"
             />
-            {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+            {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
           </div>
 
           {/* Last Name */}
@@ -132,7 +144,7 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               name="lastName"
               value={formData.lastName}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 ${
+              className={`w-full px-2 py-1.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-sm ${
                 errors.lastName ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your last name"
@@ -151,7 +163,7 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               name="department"
               value={formData.department}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 ${
+              className={`w-full px-2 py-1.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-sm ${
                 errors.department ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your department"
@@ -170,7 +182,7 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               name="position"
               value={formData.position}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              className="w-full px-2 py-1.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-sm"
               placeholder="Enter your position or title"
             />
           </div>
@@ -186,7 +198,7 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               name="contact"
               value={formData.contact}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 ${
+              className={`w-full px-2 py-1.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-sm ${
                 errors.contact ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your contact number"
@@ -205,7 +217,7 @@ const EditProfileModal = ({ isOpen, onClose, onSubmit, userData, userType }) => 
               onChange={handleChange}
               rows={3}
               maxLength={500}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-500 resize-none ${
+              className={`w-full px-2 py-1.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-sm resize-none ${
                 errors.bio ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Tell us a bit about yourself..."
