@@ -4,7 +4,7 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { useParams, Link } from 'react-router-dom';
 
-const AuditoriumDetails = () => {
+const AuditoriumDetails = ({ isLoggedIn, userRole }) => {
   const { id } = useParams();
   const [auditorium, setAuditorium] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,30 @@ const AuditoriumDetails = () => {
       <div className="mb-4">
         <span className="font-semibold">Contact:</span> {auditorium.contactInfo}
       </div>
-      <Link to="/auditoriums" className="inline-block mt-6 px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">Back to Auditoriums</Link>
+      
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row gap-4 mt-8">
+        {isLoggedIn && userRole === 'user' && (
+          <Link 
+            to={`/book-auditorium?auditorium=${auditorium._id}`}
+            className="inline-flex items-center justify-center px-8 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Book This Auditorium
+          </Link>
+        )}
+        <Link 
+          to="/auditoriums" 
+          className="inline-flex items-center justify-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors border border-gray-300"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Auditoriums
+        </Link>
+      </div>
     </div>
   );
 };

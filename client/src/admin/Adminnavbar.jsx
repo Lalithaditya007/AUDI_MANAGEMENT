@@ -25,23 +25,31 @@ const AdminNavbar = () => {
             <div className="ml-10 flex items-baseline space-x-4">
               {/* Navigation items */}
               <NavLink to="/admin-dashboard" className={({isActive}) => 
-                `hover:underline ${isActive ? 'font-bold' : ''}`}>
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
                 Dashboard
               </NavLink>
               <NavLink to="/manage-bookings" className={({isActive}) => 
-                `hover:underline ${isActive ? 'font-bold' : ''}`}>
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
                 Manage Bookings
               </NavLink>
+              <NavLink to="/admin/feedback" className={({isActive}) => 
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
+                Feedback
+              </NavLink>
+              <NavLink to="/admin/reports" className={({isActive}) => 
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
+                Reports
+              </NavLink>
               <NavLink to="/admin/create-user" className={({isActive}) => 
-                `hover:underline ${isActive ? 'font-bold' : ''}`}>
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
                 Create User
               </NavLink>
               <NavLink to="/admin/profile" className={({isActive}) => 
-                `hover:underline ${isActive ? 'font-bold' : ''}`}>
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
                 Profile
               </NavLink>
               <NavLink to="/" className={({isActive}) => 
-                `hover:underline ${isActive ? 'font-bold' : ''}`}>
+                `text-white hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium hover:underline ${isActive ? 'font-bold bg-blue-700' : ''}`}>
                 Logout
               </NavLink>
             </div>

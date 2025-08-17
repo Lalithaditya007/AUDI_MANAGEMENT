@@ -1,6 +1,6 @@
 import UserNavbar from "./Usernavbar";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -91,6 +91,7 @@ const showToast = (type, message) => {
 
 function BookAuditorium({ userEmail = "" }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // --- State Definitions ---
   const [formData, setFormData] = useState({
@@ -234,6 +235,23 @@ function BookAuditorium({ userEmail = "" }) {
     fetchAuditoriums();
     fetchDepartments();
   }, [fetchAuditoriums, fetchDepartments]);
+
+  // Handle pre-filled auditorium from URL parameters
+  useEffect(() => {
+    const auditoriumParam = searchParams.get('auditorium');
+    if (auditoriumParam && auditoriums.length > 0 && !formData.auditoriumId) {
+      // Check if the auditorium ID exists in the fetched auditoriums
+      const auditoriumExists = auditoriums.some(aud => aud._id === auditoriumParam);
+      if (auditoriumExists) {
+        setFormData(prev => ({ ...prev, auditoriumId: auditoriumParam }));
+        // Show a helpful toast message only once
+        const selectedAuditorium = auditoriums.find(aud => aud._id === auditoriumParam);
+        if (selectedAuditorium) {
+          showToast("info", `${selectedAuditorium.name} has been pre-selected for booking.`);
+        }
+      }
+    }
+  }, [searchParams, auditoriums, formData.auditoriumId]);
 
   // Check for conflicts when relevant form fields change
   useEffect(() => {

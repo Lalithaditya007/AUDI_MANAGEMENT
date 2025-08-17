@@ -4,7 +4,7 @@ import KSAudi from "../../assets/ksaudi/ksaudi1.jpg";
 import PEB from "../../assets/peb/PEB1.jpg";
 
 
-const Auditoriums = () => {
+const Auditoriums = ({ isLoggedIn, userRole }) => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [filteredAuditoriums, setFilteredAuditoriums] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,29 +87,31 @@ const Auditoriums = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
             {filteredAuditoriums.map((auditorium, index) => (
               <div key={auditorium._id || index} className="h-full">
-                <Link 
-                  to={"/auditorium/" + (auditorium._id || index)}
-                  className="group relative backdrop-blur-md bg-white/40 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/50 flex flex-col h-full"
-                >
-                  <div className="relative h-80">
-                    <img
-                      src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? (auditorium.images[0].startsWith('http') ? auditorium.images[0] : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${auditorium.images[0]}`) : KSAudi}
-                      alt={auditorium.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity group-hover:opacity-75" />
-                    <div className="absolute bottom-0 left-0 right-0 p-6">
-                      <h2 className="text-3xl font-bold mb-2 text-white text-shadow-lg">{auditorium.name}</h2>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-semibold text-white/90 inline-block px-3 py-1 bg-red-600/80 rounded-full">
-                          {auditorium.capacity} Seats
-                        </span>
-                        <span className="text-xs font-medium text-white/90 inline-block px-3 py-1 bg-black/50 backdrop-blur-sm rounded-full">
-                          {auditorium.size ? auditorium.size.charAt(0).toUpperCase() + auditorium.size.slice(1) : "Unknown"} Venue
-                        </span>
+                <div className="group relative backdrop-blur-md bg-white/40 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/50 flex flex-col h-full">
+                  <Link 
+                    to={"/auditorium/" + (auditorium._id || index)}
+                    className="block"
+                  >
+                    <div className="relative h-80">
+                      <img
+                        src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? (auditorium.images[0].startsWith('http') ? auditorium.images[0] : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${auditorium.images[0]}`) : KSAudi}
+                        alt={auditorium.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity group-hover:opacity-75" />
+                      <div className="absolute bottom-0 left-0 right-0 p-6">
+                        <h2 className="text-3xl font-bold mb-2 text-white text-shadow-lg">{auditorium.name}</h2>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-semibold text-white/90 inline-block px-3 py-1 bg-red-600/80 rounded-full">
+                            {auditorium.capacity} Seats
+                          </span>
+                          <span className="text-xs font-medium text-white/90 inline-block px-3 py-1 bg-black/50 backdrop-blur-sm rounded-full">
+                            {auditorium.size ? auditorium.size.charAt(0).toUpperCase() + auditorium.size.slice(1) : "Unknown"} Venue
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                   <div className="p-6 backdrop-blur-sm bg-white/50 flex-grow flex flex-col">
                     <p className="text-gray-700 mb-4 flex-grow">
                       {auditorium.description}
@@ -122,11 +124,16 @@ const Auditoriums = () => {
                         </span>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-red-600 font-semibold group-hover:text-red-700 transition-colors">
+                    
+                    {/* Action buttons */}
+                    <div className="flex flex-col gap-3 mt-auto">
+                      <Link 
+                        to={"/auditorium/" + (auditorium._id || index)}
+                        className="flex items-center justify-center text-red-600 font-semibold hover:text-red-700 transition-colors py-2"
+                      >
                         Explore Details
                         <svg 
-                          className="w-5 h-5 ml-2 transform transition-transform group-hover:translate-x-3" 
+                          className="w-5 h-5 ml-2 transform transition-transform group-hover:translate-x-1" 
                           fill="none" 
                           stroke="currentColor" 
                           viewBox="0 0 24 24"
@@ -138,11 +145,27 @@ const Auditoriums = () => {
                             d="M13 7l5 5m0 0l-5 5m5-5H6"
                           />
                         </svg>
+                      </Link>
+                      
+                      {auditorium.available && isLoggedIn && userRole === 'user' && (
+                        <Link 
+                          to={`/book-auditorium?auditorium=${auditorium._id}`}
+                          className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-medium hover:from-red-700 hover:to-red-800 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Book This Auditorium
+                        </Link>
+                      )}
+                      
+                      <div className="text-center">
+                        <span className="text-xs text-gray-500">{auditorium.available ? "Available for booking" : "Not available"}</span>
                       </div>
-                      <span className="text-xs text-gray-500">{auditorium.available ? "Available for booking" : "Not available"}</span>
                     </div>
                   </div>
-                </Link>
+                </div>
               </div>
             ))}
           </div>
