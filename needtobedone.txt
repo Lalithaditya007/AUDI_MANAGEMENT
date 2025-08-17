@@ -14,7 +14,7 @@
 
 # dynamically should add departments(optional)
 
-# pages should load from top if tehyre opened from footer links or any other redirects
+# pages should load from top if tehyre opened from footer links or any other redirects - done
 
 # review section need to contain data from the user reviews including images , fedback()
 
