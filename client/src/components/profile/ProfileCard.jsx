@@ -29,7 +29,7 @@ const ProfileCard = ({
           <div className="w-32 h-32 rounded-full bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center overflow-hidden border-4 border-white/50 shadow-lg">
             {userData.profilePic ? (
               <img 
-                src={userData.profilePic} 
+                src={userData.profilePic && userData.profilePic.startsWith('http') ? userData.profilePic : userData.profilePic ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${userData.profilePic}` : ''} 
                 alt="Profile" 
                 className="w-full h-full object-cover"
               />
@@ -49,6 +49,9 @@ const ProfileCard = ({
         <div className="flex-1 text-center md:text-left">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">{userData.name}</h1>
           <p className="text-lg text-gray-600 mb-1 capitalize">{userType}</p>
+          {userData.position && (
+            <p className="text-md text-gray-500 mb-2">{userData.position}</p>
+          )}
           <div className="flex flex-wrap justify-center md:justify-start gap-4 text-sm text-gray-500">
             <div className="flex items-center space-x-1">
               <Mail className="w-4 h-4" />
@@ -63,6 +66,11 @@ const ProfileCard = ({
               <span>{userData.contact}</span>
             </div>
           </div>
+          {userData.bio && (
+            <div className="mt-3 text-sm text-gray-600 max-w-md">
+              <p>{userData.bio}</p>
+            </div>
+          )}
         </div>
       </div>
 
