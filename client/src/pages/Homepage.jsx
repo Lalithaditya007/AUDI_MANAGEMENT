@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Events from '../components/Events.jsx';
 import clg from '../assets/clg.jpg';
-import { buildImageUrl } from '../utils/imagePath';
+import { buildImageUrl, buildAuditoriumImage } from '../utils/imagePath';
 import ksaudi from '../assets/ksaudi/ksaudi1.jpg'; // A fallback image
 // Note: The other images 'bblock' and 'PEB' are not used in this dynamic version, which is fine.
 import { motion } from 'motion/react';
@@ -59,7 +59,7 @@ function FeaturedAuditoriums({ isLoggedIn, userRole }) {
             <div className="h-64 overflow-hidden relative">
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
           <img
-            src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? buildImageUrl(auditorium.images[0]) : ksaudi}
+            src={Array.isArray(auditorium.images) && auditorium.images.length > 0 ? buildAuditoriumImage(auditorium.images[0]) : ksaudi}
            alt={auditorium.name}
            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
               <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
