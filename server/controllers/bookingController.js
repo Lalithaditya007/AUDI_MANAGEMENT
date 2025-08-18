@@ -419,3 +419,194 @@ exports.cancelBooking = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Server error cancelling booking.' });
     }
 };
+
+// --- Edit Booking Details (User can edit name, description, poster for approved bookings) ---
+exports.editBookingDetails = async (req, res) => {
+    const bookingId = req.params.id;
+    const userId = req.user._id;
+    const { eventName, description } = req.body;
+    let uploadedImagePath = null;
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format.' });
+    }
+
+    try {
+        // Find the booking and verify ownership
+        const booking = await Booking.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+
+        // Check if user owns this booking
+        if (booking.user.toString() !== userId.toString()) {
+            return res.status(403).json({ success: false, message: 'Access denied. You can only edit your own bookings.' });
+        }
+
+        // Only allow editing of approved bookings
+        if (booking.status !== 'approved') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Only approved bookings can be edited. Current status: ' + booking.status 
+            });
+        }
+
+        // Check if the event has already started (no editing past events)
+        const now = new Date();
+        if (booking.startTime <= now) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot edit booking details for events that have already started or ended.' 
+            });
+        }
+
+        // Prepare update object with allowed fields only
+        const updateData = {};
+        
+        if (eventName && eventName.trim()) {
+            if (eventName.trim().length > 150) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Event name cannot exceed 150 characters.' 
+                });
+            }
+            updateData.eventName = eventName.trim();
+        }
+
+        if (description && description.trim()) {
+            if (description.trim().length > 1000) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Description cannot exceed 1000 characters.' 
+                });
+            }
+            updateData.description = description.trim();
+        }
+
+        // Handle image upload if a new poster is provided
+        if (req.file) {
+            try {
+                console.log(`[Edit Booking] Processing new poster upload for booking ${bookingId}`);
+                
+                // Validate file type and size
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowedTypes.includes(req.file.mimetype)) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.' 
+                    });
+                }
+
+                const maxSize = 5 * 1024 * 1024; // 5MB
+                if (req.file.size > maxSize) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'File size too large. Maximum size is 5MB.' 
+                    });
+                }
+
+                // Use the local file path from multer
+                const uploadedImagePath = `/uploads/events/${req.file.filename}`;
+                console.log(`[Edit Booking] New poster saved locally: ${uploadedImagePath}`);
+                
+                // Delete old image files if they exist
+                if (booking.eventImages && booking.eventImages.length > 0) {
+                    const fs = require('fs');
+                    const path = require('path');
+                    
+                    for (const oldImagePath of booking.eventImages) {
+                        try {
+                            // Convert URL path to file system path
+                            const fullPath = path.join(__dirname, '..', oldImagePath);
+                            if (fs.existsSync(fullPath)) {
+                                fs.unlinkSync(fullPath);
+                                console.log(`[Edit Booking] Deleted old poster: ${oldImagePath}`);
+                            }
+                        } catch (deleteError) {
+                            console.warn(`[Edit Booking] Failed to delete old poster ${oldImagePath}:`, deleteError.message);
+                        }
+                    }
+                }
+
+                updateData.eventImages = [uploadedImagePath];
+            } catch (uploadError) {
+                console.error(`[Edit Booking] Failed to process new poster:`, uploadError);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Failed to upload new poster. Please try again.' 
+                });
+            }
+        }
+
+        // Check if there are any updates to make
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'No valid fields provided for update.' 
+            });
+        }
+
+        // Update the booking
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            bookingId,
+            updateData,
+            { new: true, runValidators: true }
+        ).populate('user', 'username email')
+         .populate('auditorium', 'name location capacity')
+         .populate('department', 'name code');
+
+        if (!updatedBooking) {
+            // Clean up uploaded image if update failed
+            if (uploadedImagePath) {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const fullPath = path.join(__dirname, '..', uploadedImagePath);
+                    if (fs.existsSync(fullPath)) {
+                        fs.unlinkSync(fullPath);
+                    }
+                } catch (cleanupError) {
+                    console.warn(`[Edit Booking] Failed to cleanup uploaded image after update failure:`, cleanupError.message);
+                }
+            }
+            return res.status(404).json({ success: false, message: 'Booking not found during update.' });
+        }
+
+        console.log(`[Edit Booking] Successfully updated booking ${bookingId}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Booking details updated successfully.',
+            data: updatedBooking
+        });
+
+    } catch (error) {
+        console.error(`[Error] Edit booking ${bookingId} failed:`, error);
+        
+        // Clean up uploaded image if there was an error
+        if (uploadedImagePath) {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const fullPath = path.join(__dirname, '..', uploadedImagePath);
+                if (fs.existsSync(fullPath)) {
+                    fs.unlinkSync(fullPath);
+                    console.log(`[Edit Booking] Cleaned up uploaded image after error: ${uploadedImagePath}`);
+                }
+            } catch (cleanupError) {
+                console.warn(`[Edit Booking] Failed to cleanup uploaded image after error:`, cleanupError.message);
+            }
+        }
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ success: false, message: messages.join('. ') });
+        }
+
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Server error updating booking details.' 
+        });
+    }
+};

@@ -5,7 +5,8 @@ const {
     getAllAuditoriums,
     getAuditoriumById,
     updateAuditorium,
-    deleteAuditorium
+    deleteAuditorium,
+    getAvailableAuditoriums
 } = require('../controllers/auditoriumController'); 
 const { protect, admin } = require('../middleware/authMiddleware'); 
 
@@ -20,6 +21,10 @@ function setAuditoriumUploadType(req, res, next) {
 router.route('/')
     .post(protect, admin, setAuditoriumUploadType, upload.array('images', 5), createAuditorium)
     .get(getAllAuditoriums);
+
+// Route for getting available auditoriums based on time slot
+router.route('/available')
+    .get(protect, getAvailableAuditoriums);
 
 router.route('/:id')
     .get(getAuditoriumById)

@@ -108,6 +108,86 @@ exports.getAllAuditoriums = async (req, res, next) => {
   }
 };
 
+exports.getAvailableAuditoriums = async (req, res, next) => {
+  const { startTime, endTime } = req.query;
+
+  // Validate required parameters
+  if (!startTime || !endTime) {
+    return res.status(400).json({
+      success: false,
+      message: 'Both startTime and endTime are required parameters'
+    });
+  }
+
+  try {
+    // Parse and validate dates
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format for startTime or endTime'
+      });
+    }
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'startTime must be before endTime'
+      });
+    }
+
+    // Get all auditoriums
+    const allAuditoriums = await Auditorium.find({ available: true }).sort({ name: 1 });
+
+    // Find auditoriums that have conflicting bookings in the requested time slot
+    const conflictingBookings = await Booking.find({
+      status: { $in: ['approved', 'pending'] }, // Consider both approved and pending bookings
+      $or: [
+        {
+          // Booking starts during the requested slot
+          startTime: { $gte: start, $lt: end }
+        },
+        {
+          // Booking ends during the requested slot  
+          endTime: { $gt: start, $lte: end }
+        },
+        {
+          // Booking completely encompasses the requested slot
+          startTime: { $lte: start },
+          endTime: { $gte: end }
+        }
+      ]
+    }).select('auditorium');
+
+    // Get IDs of auditoriums with conflicts
+    const conflictingAuditoriumIds = conflictingBookings.map(booking => booking.auditorium.toString());
+
+    // Filter out auditoriums with conflicts
+    const availableAuditoriums = allAuditoriums.filter(auditorium => 
+      !conflictingAuditoriumIds.includes(auditorium._id.toString())
+    );
+
+    res.status(200).json({
+      success: true,
+      count: availableAuditoriums.length,
+      data: availableAuditoriums,
+      requestedSlot: {
+        startTime: start.toISOString(),
+        endTime: end.toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error("Error getting available auditoriums:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while retrieving available auditoriums.' 
+    });
+  }
+};
+
 exports.getAuditoriumById = async (req, res, next) => {
   const auditoriumId = req.params.id;
 
