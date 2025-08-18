@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-// import { Link } from "react-router-dom";
+import { buildImageUrl } from '../utils/imagePath';
 
 const AllEvents = () => {
   const [events, setEvents] = useState([]);
@@ -141,14 +141,7 @@ const AllEvents = () => {
                         className={`relative w-full aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden ${event.eventImages?.length ? 'cursor-pointer' : ''}`}
                         onClick={() => {
                           if (event.eventImages && event.eventImages.length > 0) {
-                            const raw = event.eventImages[0];
-                            let full;
-                            if (raw.startsWith('http')) full = raw; else {
-                              let rel = raw.startsWith('/') ? raw : (raw.startsWith('uploads') ? `/${raw}` : `/uploads/events/${raw}`);
-                              rel = rel.replace(/\\/g, '/').replace(/\/\/+/g, '/');
-                              const base = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/$/, '');
-                              full = `${base}${rel}`;
-                            }
+                            const full = buildImageUrl(event.eventImages[0]);
                             setPreview({ open: true, src: full, title: event.eventName });
                           }
                         }}
@@ -156,7 +149,7 @@ const AllEvents = () => {
                       >
                         {event.eventImages && event.eventImages.length > 0 ? (
                           <img
-                            src={( () => { const raw = event.eventImages[0]; if (!raw) return ''; if (raw.startsWith('http')) return raw; let rel = raw.startsWith('/') ? raw : (raw.startsWith('uploads') ? `/${raw}` : `/uploads/events/${raw}`); rel = rel.replace(/\\/g,'/').replace(/\/\/+/g,'/'); const base = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/$/,''); return `${base}${rel}`; })()}
+                            src={buildImageUrl(event.eventImages[0])}
                             alt={event.eventName}
                             className={
                               `w-full h-full transition-transform duration-500 group-hover:scale-105 ` +
