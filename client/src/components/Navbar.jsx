@@ -47,7 +47,7 @@ const Navbar = ({ isLoggedIn, userRole }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     return (
         <>
-            <nav className={`fixed top-0 left-0 right-0 p-4 z-50 transition-all duration-300 bg-white/20 backdrop-blur-md shadow-sm`}>
+            <nav className={`fixed top-0 left-0 right-0 pt-2 pb-2 px-0 z-50 transition-all duration-300 bg-white/10 backdrop-blur-md shadow-sm`}>
                 <div className="container mx-auto flex items-center justify-between">
                     <div className="flex items-center">
                         <NavLink to="/">
