@@ -13,6 +13,7 @@ const {
     getBookingStats,
     withdrawBooking,
     requestReschedule,
+    editBookingDetails,
     getAuditoriumSchedule,
     getRecentPendingBookings,
     getUpcomingBookings,
@@ -95,8 +96,10 @@ router.route('/admin/pending-upcoming')
 
 // DELETE /api/bookings/:id (Withdraw - User)
 // PUT /api/bookings/:id/reschedule (Request Reschedule - User) - Changed from PUT /:id based on previous structure
+// PUT /api/bookings/:id/edit (Edit booking details - User)
 router.route('/:id')
-    .delete(protect, withdrawBooking);
+    .delete(protect, withdrawBooking)
+    .put(protect, setEventUploadType, upload.single('eventPoster'), editBookingDetails);
 
 router.route('/:id/reschedule') // Separate route for reschedule PUT request
     .put(protect, requestReschedule);
