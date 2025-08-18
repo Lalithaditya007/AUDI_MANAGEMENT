@@ -374,7 +374,7 @@ exports.editBookingDetails = async (req, res) => {
     const bookingId = req.params.id;
     const userId = req.user._id;
     const { eventName, description } = req.body;
-    let uploadedBlobUrl = null;
+    let uploadedImagePath = null;
 
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(bookingId)) {
@@ -455,25 +455,32 @@ exports.editBookingDetails = async (req, res) => {
                     });
                 }
 
-                // Upload new image to Azure
-                uploadedBlobUrl = await uploadToAzure(req.file.buffer, req.file.originalname, req.file.mimetype);
-                console.log(`[Edit Booking] New poster uploaded successfully: ${uploadedBlobUrl}`);
+                // Use the local file path from multer
+                const uploadedImagePath = `/uploads/events/${req.file.filename}`;
+                console.log(`[Edit Booking] New poster saved locally: ${uploadedImagePath}`);
                 
-                // Delete old image if it exists
+                // Delete old image files if they exist
                 if (booking.eventImages && booking.eventImages.length > 0) {
-                    for (const oldImageUrl of booking.eventImages) {
+                    const fs = require('fs');
+                    const path = require('path');
+                    
+                    for (const oldImagePath of booking.eventImages) {
                         try {
-                            await deleteFromAzure(oldImageUrl);
-                            console.log(`[Edit Booking] Deleted old poster: ${oldImageUrl}`);
+                            // Convert URL path to file system path
+                            const fullPath = path.join(__dirname, '..', oldImagePath);
+                            if (fs.existsSync(fullPath)) {
+                                fs.unlinkSync(fullPath);
+                                console.log(`[Edit Booking] Deleted old poster: ${oldImagePath}`);
+                            }
                         } catch (deleteError) {
-                            console.warn(`[Edit Booking] Failed to delete old poster ${oldImageUrl}:`, deleteError.message);
+                            console.warn(`[Edit Booking] Failed to delete old poster ${oldImagePath}:`, deleteError.message);
                         }
                     }
                 }
 
-                updateData.eventImages = [uploadedBlobUrl];
+                updateData.eventImages = [uploadedImagePath];
             } catch (uploadError) {
-                console.error(`[Edit Booking] Failed to upload new poster:`, uploadError);
+                console.error(`[Edit Booking] Failed to process new poster:`, uploadError);
                 return res.status(500).json({ 
                     success: false, 
                     message: 'Failed to upload new poster. Please try again.' 
@@ -500,9 +507,14 @@ exports.editBookingDetails = async (req, res) => {
 
         if (!updatedBooking) {
             // Clean up uploaded image if update failed
-            if (uploadedBlobUrl) {
+            if (uploadedImagePath) {
                 try {
-                    await deleteFromAzure(uploadedBlobUrl);
+                    const fs = require('fs');
+                    const path = require('path');
+                    const fullPath = path.join(__dirname, '..', uploadedImagePath);
+                    if (fs.existsSync(fullPath)) {
+                        fs.unlinkSync(fullPath);
+                    }
                 } catch (cleanupError) {
                     console.warn(`[Edit Booking] Failed to cleanup uploaded image after update failure:`, cleanupError.message);
                 }
@@ -522,10 +534,15 @@ exports.editBookingDetails = async (req, res) => {
         console.error(`[Error] Edit booking ${bookingId} failed:`, error);
         
         // Clean up uploaded image if there was an error
-        if (uploadedBlobUrl) {
+        if (uploadedImagePath) {
             try {
-                await deleteFromAzure(uploadedBlobUrl);
-                console.log(`[Edit Booking] Cleaned up uploaded image after error: ${uploadedBlobUrl}`);
+                const fs = require('fs');
+                const path = require('path');
+                const fullPath = path.join(__dirname, '..', uploadedImagePath);
+                if (fs.existsSync(fullPath)) {
+                    fs.unlinkSync(fullPath);
+                    console.log(`[Edit Booking] Cleaned up uploaded image after error: ${uploadedImagePath}`);
+                }
             } catch (cleanupError) {
                 console.warn(`[Edit Booking] Failed to cleanup uploaded image after error:`, cleanupError.message);
             }
