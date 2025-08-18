@@ -107,13 +107,26 @@ const ProfileCard = ({
         {/* Section Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Profile Details</h2>
-          <button
-            onClick={onEditProfile}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
-          >
-            <Edit className="w-4 h-4" />
-            <span>Edit Profile</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onEditProfile}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
+            >
+              <Edit className="w-4 h-4" />
+              <span>Edit Profile</span>
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userRole');
+                localStorage.removeItem('userEmail');
+                window.location.href = '/login';
+              }}
+              className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-sm"
+            >
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
 
         {/* Profile Details Grid */}
@@ -316,6 +329,8 @@ const ProfileCard = ({
               Report Issue
             </button>
           </div>
+
+          
         </div>
       </div>
       </div>
