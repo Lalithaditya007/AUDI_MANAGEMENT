@@ -68,6 +68,7 @@ function BookingHistory() {
   const [editEventName, setEditEventName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPoster, setEditPoster] = useState(null);
+  const [editPosterPreview, setEditPosterPreview] = useState(null);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -400,10 +401,15 @@ function BookingHistory() {
   const closeEditModal = () => {
     setIsEditModalOpen(false);
     setTimeout(() => {
+      // Clean up preview URL to prevent memory leaks
+      if (editPosterPreview) {
+        URL.revokeObjectURL(editPosterPreview);
+      }
       setEditBooking(null);
       setEditEventName("");
       setEditDescription("");
       setEditPoster(null);
+      setEditPosterPreview(null);
       setEditError("");
     }, 300);
   };
@@ -487,6 +493,7 @@ function BookingHistory() {
     const file = e.target.files[0];
     if (!file) {
       setEditPoster(null);
+      setEditPosterPreview(null);
       return;
     }
     
@@ -507,6 +514,10 @@ function BookingHistory() {
     }
     
     setEditPoster(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setEditPosterPreview(previewUrl);
   };
 
   const removeEditPoster = () => {
@@ -576,8 +587,8 @@ function BookingHistory() {
                     
                     // --- CORRECTED IMAGE URL LOGIC ---
                     const imagePath = booking.eventImages?.[0];
-                    // Use the full Azure URL directly if it starts with http
-                    const imgUrl = imagePath && imagePath.startsWith('http') ? imagePath : null; 
+                    // Support both local paths (/uploads/...) and external URLs (http...)
+                    const imgUrl = imagePath ? imagePath : null; 
                     // --- END CORRECTION ---
 
                     const actInProgress=!!(withdrawingId||isSubmittingReschedule||isSubmittingEdit); const thisWdProgress=withdrawingId===booking._id;
@@ -771,16 +782,30 @@ function BookingHistory() {
                                 <p className="mt-1 text-xs text-gray-500">
                                     Leave empty to keep current poster. Max size: 5MB. Formats: JPG, PNG, GIF
                                 </p>
-                                {editBooking?.posterUrl && (
-                                    <div className="mt-2">
-                                        <p className="text-xs text-gray-600 mb-1">Current poster:</p>
-                                        <img
-                                            src={editBooking.posterUrl}
-                                            alt="Current poster"
-                                            className="w-20 h-20 object-cover rounded border border-gray-200"
-                                        />
-                                    </div>
-                                )}
+                                
+                                {/* Image previews */}
+                                <div className="mt-2 flex gap-4">
+                                    {editBooking?.eventImages?.[0] && (
+                                        <div>
+                                            <p className="text-xs text-gray-600 mb-1">Current poster:</p>
+                                            <img
+                                                src={`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${editBooking.eventImages[0]}`}
+                                                alt="Current poster"
+                                                className="w-20 h-20 object-cover rounded border border-gray-200"
+                                            />
+                                        </div>
+                                    )}
+                                    {editPosterPreview && (
+                                        <div>
+                                            <p className="text-xs text-gray-600 mb-1">New poster preview:</p>
+                                            <img
+                                                src={editPosterPreview}
+                                                alt="New poster preview"
+                                                className="w-20 h-20 object-cover rounded border border-green-300"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Locked fields info */}
