@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 
 const AdminNavbar = () => {
   return (
-  <nav className="backdrop-blur-md bg-white/20 bg-opacity-60 text-white fixed w-full z-50 top-0 left-0 shadow-lg">
+  <nav className="backdrop-blur-md bg-gradient-to-r from-blue-900/80 to-blue-700/80 text-white fixed w-full z-[100] top-0 left-0 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -12,7 +12,7 @@ const AdminNavbar = () => {
           </div>
           {/* Mobile menu button */}
           <div className="md:hidden">
-            <button className="text-white hover:text-blue-300 focus:outline-none bg-white/10 border border-white/30 rounded p-2 backdrop-blur-lg">
+            <button className="text-white hover:text-blue-300 focus:outline-none bg-blue-900/30 border border-blue-700/40 rounded p-2 backdrop-blur-lg">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>

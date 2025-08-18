@@ -206,7 +206,58 @@ exports.checkAvailability = async (req, res, next) => {
 };
 exports.getPublicEvents = async (req, res) => {
     // ... (keep existing implementation) ...
-     try { const nowIST = DateTime.now().setZone(istTimezone); const nowUTC = nowIST.toUTC().toJSDate(); const nextWeekIST = nowIST.plus({ days: 7 }); const nextWeekUTC = nextWeekIST.toUTC().toJSDate(); const events = await Booking.find({ status: 'approved', $or: [ { startTime: { $lte: nowUTC }, endTime: { $gte: nowUTC } }, { startTime: { $gt: nowUTC, $lt: nextWeekUTC } } ] }).sort({ startTime: 1 }).populate('auditorium', 'name').select('eventName startTime endTime auditorium eventImages description'); res.status(200).json({ success: true, data: events }); } catch (error) { console.error("[Error] Fetching public events failed:", error); res.status(500).json({ success: false, message: 'Error fetching public events.' }); }
+     try {
+        // Nearest upcoming events (including ones already ongoing) ordered by soonest startTime
+        // Added pagination support: ?page=1&limit=9 (defaults)
+        // Optional futureDays filter (?days=30) to limit how far ahead to look (defaults unlimited)
+        const nowIST = DateTime.now().setZone(istTimezone);
+        const nowUTC = nowIST.toUTC().toJSDate();
+
+        const pageParam = parseInt(req.query.page, 10);
+        const limitParam = parseInt(req.query.limit, 10);
+        const daysParam = parseInt(req.query.days, 10); // optional cap on future range
+
+        const page = (!isNaN(pageParam) && pageParam > 0) ? pageParam : 1;
+        const limit = (!isNaN(limitParam) && limitParam > 0) ? Math.min(limitParam, 50) : 9;
+
+        let timeWindowFilter = {};
+        if (!isNaN(daysParam) && daysParam > 0) {
+            const futureCutoffIST = nowIST.plus({ days: Math.min(daysParam, 365) }).endOf('day');
+            const futureCutoffUTC = futureCutoffIST.toUTC().toJSDate();
+            // Events not finished yet and starting before cutoff
+            timeWindowFilter = { endTime: { $gte: nowUTC }, startTime: { $lte: futureCutoffUTC } };
+        } else {
+            // All events not finished yet (any time in future / ongoing)
+            timeWindowFilter = { endTime: { $gte: nowUTC } };
+        }
+
+        const baseQuery = { status: 'approved', ...timeWindowFilter };
+
+        const totalCount = await Booking.countDocuments(baseQuery);
+        const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+        const safePage = Math.min(page, totalPages); // clamp if page too high
+        const skip = (safePage - 1) * limit;
+
+        const events = await Booking.find(baseQuery)
+            .sort({ startTime: 1 }) // soonest first
+            .skip(skip)
+            .limit(limit)
+            .populate('auditorium', 'name location capacity description')
+            .select('eventName startTime endTime auditorium eventImages description');
+
+        res.status(200).json({
+            success: true,
+            page: safePage,
+            limit,
+            count: events.length,
+            totalCount,
+            totalPages,
+            data: events
+        });
+    } catch (error) {
+        console.error("[Error] Fetching public events failed:", error);
+        res.status(500).json({ success: false, message: 'Error fetching public events.' });
+    }
 };
 exports.checkBookingConflicts = async (req, res) => {
     // ... (keep existing implementation) ...

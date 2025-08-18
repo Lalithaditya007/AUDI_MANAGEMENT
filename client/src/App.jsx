@@ -1,4 +1,5 @@
 import EditAuditorium from "./admin/EditAuditorium";
+import AllEvents from "./pages/AllEvents";
 import ManageUsers from "./admin/ManageUsers";
 import ManageAuditoriums from "./admin/ManageAuditoriums";
 import React, { useState, useEffect } from "react";
@@ -24,6 +25,7 @@ import AdminProfile from "./admin/AdminProfile";
 import UserProfile from "./user/UserProfile";
 import AuthDebug from "./components/AuthDebug";
 import ScrollToTop from "./components/ScrollToTop";
+import NotFound from "./pages/NotFound";
 
 
 function AppContent() {
@@ -50,6 +52,7 @@ function AppContent() {
                     <Route path="/" element={<Homepage isLoggedIn={isLoggedIn} userRole={userRole} />} />
                     {/* --- END MODIFICATION --- */}
                     <Route path="/auditoriums" element={<Auditoriums isLoggedIn={isLoggedIn} userRole={userRole} />} />
+                    <Route path="/events" element={<AllEvents />} />
                     <Route path="/auditorium/:id" element={<AuditoriumDetails isLoggedIn={isLoggedIn} userRole={userRole} />} />
                     <Route path="/ks-auditorium" element={<KSAudi />} />
                     <Route path="/b-block-seminar-hall" element={<BBlockSeminarHall />} />
@@ -95,7 +98,7 @@ function AppContent() {
                     {/* Debug Route - Remove in production */}
                     <Route path="/debug" element={<AuthDebug />} />
 
-                    <Route path="*" element={<div className="p-10 text-center"><h2>404 Not Found</h2></div>} />
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
             </main>
             <Footer />

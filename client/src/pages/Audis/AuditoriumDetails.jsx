@@ -3,6 +3,7 @@ import Slider from 'react-slick';
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { useParams, Link } from 'react-router-dom';
+import NotFound from '../NotFound';
 
 const AuditoriumDetails = ({ isLoggedIn, userRole }) => {
   const { id } = useParams();
@@ -31,8 +32,7 @@ const AuditoriumDetails = ({ isLoggedIn, userRole }) => {
   }, [id]);
 
   if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-600"></div></div>;
-  if (error) return <div className="text-center text-red-600 mt-10">{error}</div>;
-  if (!auditorium) return null;
+  if (error || !auditorium) return <NotFound />;
 
   // Carousel settings
   const settings = {

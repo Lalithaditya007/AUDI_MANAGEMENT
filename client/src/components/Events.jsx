@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { buildImageUrl } from '../utils/imagePath';
 
 // Simple fallback for when images don't load
 const fallbackGradient = "bg-gradient-to-r from-red-800 to-red-900";
@@ -36,8 +37,7 @@ const Events = () => {
 
             // --- CORRECTED IMAGE URL LOGIC ---
             const imagePath = booking.eventImages?.[0];
-            // Use the full URL directly if it starts with http (like Azure URLs)
-            const imageUrl = imagePath && imagePath.startsWith('http') ? imagePath : null;
+            const imageUrl = imagePath ? buildImageUrl(imagePath) : null;
             // --- END CORRECTION ---
 
             // Generate an initial random factor for each event (will be updated on image load)
