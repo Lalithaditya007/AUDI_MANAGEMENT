@@ -97,8 +97,8 @@ function FeaturedAuditoriums({ isLoggedIn, userRole }) {
 const HomePage = ({ isLoggedIn, userRole }) => {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Hero Section */}
-  <header className="relative min-h-[100vh] flex items-center justify-center">
+    {/* Hero Section */}
+  <header id="hero" className="relative min-h-[100vh] pb-[75px] flex items-center justify-center">
         {/* Background Image */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"

@@ -158,11 +158,15 @@ const AdminProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white py-8">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-red-50 via-white to-red-50 py-8">
+      {/* Subtle background accents */}
+      <div className="pointer-events-none absolute -top-32 -left-32 w-[28rem] h-[28rem] rounded-full bg-rose-200/30 blur-3xl -z-10" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 w-[36rem] h-[36rem] rounded-full bg-red-200/20 blur-3xl -z-10" />
+
       <div className="container mx-auto px-4 flex flex-col items-center">
         {/* Page Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 mt-20">Admin Profile</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Profile</h1>
           <p className="text-gray-600">Manage your administrative account settings</p>
         </div>
 
