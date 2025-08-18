@@ -245,10 +245,17 @@ exports.updateAuditorium = async (req, res, next) => {
   }
 
   // Handle multiple uploaded files (multer's upload.array)
-  if (req.files && req.files.length > 0) {
-    updateData.images = req.files.map(file => `/uploads/auditorium/${file.filename}`);
-  } else if (updateData.images) {
-    updateData.images = Array.isArray(updateData.images) ? updateData.images : [updateData.images];
+  // Merge existing images provided in the body with newly uploaded files
+  const existingImagesFromBody = updateData.images
+    ? (Array.isArray(updateData.images) ? updateData.images : [updateData.images])
+    : [];
+  const uploadedImages = (req.files && req.files.length > 0)
+    ? req.files.map(file => `/uploads/auditorium/${file.filename}`)
+    : [];
+  if (existingImagesFromBody.length > 0 || uploadedImages.length > 0) {
+    // Deduplicate while preserving order
+    const merged = [...existingImagesFromBody, ...uploadedImages];
+    updateData.images = Array.from(new Set(merged));
   }
 
   // Validate ID format

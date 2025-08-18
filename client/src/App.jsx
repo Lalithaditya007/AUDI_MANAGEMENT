@@ -35,12 +35,14 @@ function AppContent() {
 
     useEffect(() => { const handler = () => { setIsLoggedIn(!!localStorage.getItem('authToken')); setUserRole(localStorage.getItem('userRole') || ""); setUserEmail(localStorage.getItem('userEmail') || ""); }; window.addEventListener('storage', handler); return () => { window.removeEventListener('storage', handler); }; }, []);
 
+    const isHome = location.pathname === '/';
+
     return (
         <div className="flex flex-col min-h-screen">
             <ScrollToTop />
             <Navbar isLoggedIn={isLoggedIn} userRole={userRole} setIsLoggedIn={setIsLoggedIn} setUserRole={setUserRole} setUserEmail={setUserEmail} />
             {/* Spacer to offset the fixed Navbar height so content isn't hidden */}
-            <div className="h-20 md:h-24" aria-hidden="true"></div>
+            <div className={`${isHome ? 'h-0' : 'h-20 md:h-24'}`} aria-hidden="true"></div>
             <main className="flex-grow">
                 <Routes>
                     {/* Public Routes */}

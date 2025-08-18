@@ -1,23 +1,9 @@
 import React from 'react';
-import Slider from 'react-slick';
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
 
 const AuditoriumPreviewModal = ({ auditorium, onClose }) => {
 	if (!auditorium) return null;
 
-	// Carousel settings
-		const settings = {
-			dots: true,
-			infinite: true,
-			speed: 500,
-			slidesToShow: 1,
-			slidesToScroll: 1,
-			arrows: true,
-			adaptiveHeight: true,
-			autoplay: true,
-			autoplaySpeed: 3000,
-		};
+
 
 	return (
 							<div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-[6px]">
@@ -33,18 +19,18 @@ const AuditoriumPreviewModal = ({ auditorium, onClose }) => {
 													<div><span className="font-semibold text-gray-700">Size:</span> <span className="text-gray-900">{auditorium.size}</span></div>
 												</div>
 												{auditorium.images && auditorium.images.length > 0 && (
-													<div className="mt-2 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-														<Slider {...{...settings, autoplaySpeed: 3000}}>
+													<div className="mt-2 rounded-xl border border-gray-200 bg-white p-2">
+														<div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 															{auditorium.images.map((img, idx) => (
-																<div key={idx} className="flex justify-center items-center">
+																<div key={idx} className="relative group">
 																	<img
 																		src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`}
 																		alt={`Auditorium ${idx + 1}`}
-																		className="w-full h-56 object-cover rounded-xl"
+																		className="w-full h-40 object-cover rounded-lg border border-gray-200"
 																	/>
 																</div>
 															))}
-														</Slider>
+														</div>
 													</div>
 												)}
 			</div>
