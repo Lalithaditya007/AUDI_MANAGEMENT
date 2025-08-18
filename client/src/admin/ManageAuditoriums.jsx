@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import AuditoriumPreviewModal from './AuditoriumPreviewModal';
-import Slider from 'react-slick';
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
 import { useNavigate } from 'react-router-dom';
 import { FaTrash, FaEdit, FaPlus } from 'react-icons/fa';
 
@@ -83,28 +80,18 @@ const ManageAuditoriums = () => {
               onClick={() => handlePreview(aud)}
             >
               {aud.images && aud.images.length > 0 ? (
-                <Slider
-                  dots={true}
-                  infinite={true}
-                  speed={1000}
-                  slidesToShow={1}
-                  slidesToScroll={1}
-                  arrows={true}
-                  adaptiveHeight={true}
-                  autoplay={true}
-                  autoplaySpeed={2000}
-                  className="w-full h-40 rounded-t-lg"
-                >
-                  {aud.images.map((img, idx) => (
-                    <div key={idx} className="flex justify-center items-center">
-                      <img
-                        src={img.startsWith('http') ? img : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img}`}
-                        alt={aud.name}
-                        className="w-full h-40 object-cover rounded-t-lg"
-                      />
+                <div className="relative w-full h-40">
+                  <img
+                    src={aud.images[0].startsWith('http') ? aud.images[0] : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${aud.images[0]}`}
+                    alt={aud.name}
+                    className="w-full h-40 object-cover rounded-t-lg"
+                  />
+                  {aud.images.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                      +{aud.images.length - 1} more
                     </div>
-                  ))}
-                </Slider>
+                  )}
+                </div>
               ) : (
                 <div className="w-full h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center rounded-t-lg text-gray-400 font-semibold text-lg">No Image</div>
               )}
