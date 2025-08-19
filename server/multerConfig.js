@@ -52,6 +52,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedMimeTypes.test(file.mimetype)) {
     cb(null, true);
   } else {
+    console.error(`File type rejected: ${file.mimetype} for upload type: ${uploadType}`);
     cb(new Error(`Invalid file type for ${uploadType}. Only ${allowedMimeTypes} files are allowed.`), false);
   }
 };

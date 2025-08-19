@@ -110,8 +110,15 @@ exports.createBooking = async (req, res) => {
 
 
         let eventImages = [];
-        if (req.file) {
+        // Handle file upload - check if files were uploaded
+        if (req.files && req.files.eventPoster && req.files.eventPoster.length > 0) {
+            const uploadedFile = req.files.eventPoster[0];
+            console.log('File uploaded:', uploadedFile.filename);
             // Store path relative to /uploads/events/
+            eventImages.push(`/uploads/events/${uploadedFile.filename}`);
+        } else if (req.file) {
+            // Fallback for single file upload (if still using upload.single somewhere)
+            console.log('Single file uploaded:', req.file.filename);
             eventImages.push(`/uploads/events/${req.file.filename}`);
         }
 
@@ -485,13 +492,21 @@ exports.editBookingDetails = async (req, res) => {
         }
 
         // Handle image upload if a new poster is provided
-        if (req.file) {
+        let uploadedFile = null;
+        if (req.files && req.files.eventPoster && req.files.eventPoster.length > 0) {
+            uploadedFile = req.files.eventPoster[0];
+        } else if (req.file) {
+            // Fallback for single file upload
+            uploadedFile = req.file;
+        }
+        
+        if (uploadedFile) {
             try {
                 console.log(`[Edit Booking] Processing new poster upload for booking ${bookingId}`);
                 
                 // Validate file type and size
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!allowedTypes.includes(req.file.mimetype)) {
+                if (!allowedTypes.includes(uploadedFile.mimetype)) {
                     return res.status(400).json({ 
                         success: false, 
                         message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.' 
@@ -499,7 +514,7 @@ exports.editBookingDetails = async (req, res) => {
                 }
 
                 const maxSize = 5 * 1024 * 1024; // 5MB
-                if (req.file.size > maxSize) {
+                if (uploadedFile.size > maxSize) {
                     return res.status(400).json({ 
                         success: false, 
                         message: 'File size too large. Maximum size is 5MB.' 
@@ -507,7 +522,7 @@ exports.editBookingDetails = async (req, res) => {
                 }
 
                 // Use the local file path from multer
-                const uploadedImagePath = `/uploads/events/${req.file.filename}`;
+                const uploadedImagePath = `/uploads/events/${uploadedFile.filename}`;
                 console.log(`[Edit Booking] New poster saved locally: ${uploadedImagePath}`);
                 
                 // Delete old image files if they exist

@@ -31,9 +31,21 @@ exports.createAuditorium = async (req, res, next) => {
   const createdBy = body.createdBy;
   const customFields = body.customFields;
   let images = [];
-  // Handle multiple uploaded files (multer's upload.array)
-  if (req.files && req.files.length > 0) {
-    images = req.files.map(file => `/uploads/auditorium/${file.filename}`);
+  // Handle uploaded files - both single 'image' field and multiple 'images' field
+  if (req.files) {
+    // Handle single image from 'image' field
+    if (req.files.image && req.files.image.length > 0) {
+      images = req.files.image.map(file => `/uploads/auditorium/${file.filename}`);
+    }
+    // Handle multiple images from 'images' field
+    if (req.files.images && req.files.images.length > 0) {
+      const multipleImages = req.files.images.map(file => `/uploads/auditorium/${file.filename}`);
+      images = [...images, ...multipleImages];
+    }
+    // Fallback for old array format (req.files directly as array)
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      images = req.files.map(file => `/uploads/auditorium/${file.filename}`);
+    }
   } else if (body.images) {
     // fallback for JSON
     images = Array.isArray(body.images) ? body.images : [body.images];
@@ -244,14 +256,28 @@ exports.updateAuditorium = async (req, res, next) => {
     updateData.size = updateData.size.find(s => typeof s === 'string' && s.length > 0) || '';
   }
 
-  // Handle multiple uploaded files (multer's upload.array)
+  // Handle uploaded files - both single 'image' field and multiple 'images' field
   // Merge existing images provided in the body with newly uploaded files
   const existingImagesFromBody = updateData.images
     ? (Array.isArray(updateData.images) ? updateData.images : [updateData.images])
     : [];
-  const uploadedImages = (req.files && req.files.length > 0)
-    ? req.files.map(file => `/uploads/auditorium/${file.filename}`)
-    : [];
+  
+  let uploadedImages = [];
+  if (req.files) {
+    // Handle single image from 'image' field
+    if (req.files.image && req.files.image.length > 0) {
+      uploadedImages = [...uploadedImages, ...req.files.image.map(file => `/uploads/auditorium/${file.filename}`)];
+    }
+    // Handle multiple images from 'images' field
+    if (req.files.images && req.files.images.length > 0) {
+      uploadedImages = [...uploadedImages, ...req.files.images.map(file => `/uploads/auditorium/${file.filename}`)];
+    }
+    // Fallback for old array format (req.files directly as array)
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      uploadedImages = req.files.map(file => `/uploads/auditorium/${file.filename}`);
+    }
+  }
+  
   if (existingImagesFromBody.length > 0 || uploadedImages.length > 0) {
     // Deduplicate while preserving order
     const merged = [...existingImagesFromBody, ...uploadedImages];

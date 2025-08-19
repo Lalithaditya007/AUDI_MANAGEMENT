@@ -47,7 +47,7 @@ router.get('/public/events', getPublicEvents);
 
 // POST /api/bookings/ (Create Booking - User, uses multer)
 router.route('/')
-    .post(protect, setEventUploadType, upload.single('eventPoster'), createBooking); // 'eventPoster' is the field name in the form
+    .post(protect, setEventUploadType, upload.fields([{ name: 'eventPoster', maxCount: 1 }]), createBooking); // Allow eventPoster field specifically
 
 // GET /api/bookings/mybookings (Get User's Bookings - User)
 router.route('/mybookings')
@@ -99,7 +99,7 @@ router.route('/admin/pending-upcoming')
 // PUT /api/bookings/:id/edit (Edit booking details - User)
 router.route('/:id')
     .delete(protect, withdrawBooking)
-    .put(protect, setEventUploadType, upload.single('eventPoster'), editBookingDetails);
+    .put(protect, setEventUploadType, upload.fields([{ name: 'eventPoster', maxCount: 1 }]), editBookingDetails);
 
 router.route('/:id/reschedule') // Separate route for reschedule PUT request
     .put(protect, requestReschedule);

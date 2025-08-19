@@ -101,6 +101,7 @@ function BookAuditorium() {
     departmentId: "",
     eventPoster: null,
   });
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [auditoriums, setAuditoriums] = useState([]);
   const [availableAuditoriums, setAvailableAuditoriums] = useState([]);
   const [isLoadingAuditoriums, setIsLoadingAuditoriums] = useState(false);
@@ -267,6 +268,17 @@ function BookAuditorium() {
     }
   }, [searchParams, auditoriums, formData.auditoriumId]);
 
+  // Cleanup object URLs when component unmounts or when eventPoster changes
+  useEffect(() => {
+    return () => {
+      // Clean up preview URL when component unmounts
+      if (imagePreviewUrl) {
+        console.log("Component unmounting, cleaning up preview URL:", imagePreviewUrl);
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
+
   // --- Form Input Handlers ---
   function handleChange(e) {
     const { name, value } = e.target;
@@ -280,12 +292,72 @@ function BookAuditorium() {
   }
   function handleFileChange(e) {
     const file = e.target.files[0];
-    setFormData((prev) => ({ ...prev, eventPoster: file || null }));
+    console.log("File change triggered:", file ? file.name : "No file selected");
+    
+    // Clean up previous preview URL
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+      setImagePreviewUrl(null);
+    }
+    
+    if (file) {
+      console.log("File details:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: file.lastModified
+      });
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        console.error("Invalid file type:", file.type);
+        showToast("error", "Please select a valid image file (JPEG, PNG, or GIF)");
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        console.error("File too large:", file.size);
+        showToast("error", "File size must be less than 5MB");
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      
+      console.log("File validation passed, creating preview URL");
+      
+      // Create preview URL
+      try {
+        const previewUrl = URL.createObjectURL(file);
+        console.log("Created preview URL:", previewUrl);
+        setImagePreviewUrl(previewUrl);
+      } catch (error) {
+        console.error("Error creating object URL:", error);
+        showToast("error", "Error creating image preview");
+        return;
+      }
+    }
+    
+    setFormData((prev) => {
+      const updated = { ...prev, eventPoster: file || null };
+      console.log("Updated form data with eventPoster:", updated.eventPoster ? "File selected" : "No file");
+      return updated;
+    });
   }
   function removePoster() {
+    // Clean up the object URL
+    if (imagePreviewUrl) {
+      console.log("Cleaning up preview URL:", imagePreviewUrl);
+      URL.revokeObjectURL(imagePreviewUrl);
+      setImagePreviewUrl(null);
+    }
+    
     setFormData((prev) => ({ ...prev, eventPoster: null }));
     const fileInput = document.querySelector('input[name="eventPoster"]');
-    if (fileInput) fileInput.value = null;
+    if (fileInput) fileInput.value = '';
+    
+    console.log("Poster removed and form data cleared");
   }
 
 
@@ -597,17 +669,31 @@ function BookAuditorium() {
                 ) : (
                   // Display preview and remove button
                   <div className="relative mt-2 w-48 h-48 sm:w-56 sm:h-56">
-                    <img
-                      src={URL.createObjectURL(formData.eventPoster)}
-                      alt="Preview"
-                      className="w-full h-full object-cover rounded-lg"
-                      onLoad={(e) => URL.revokeObjectURL(e.target.src)} // Revoke object URL after load
-                    />
+                    {imagePreviewUrl ? (
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-lg border border-gray-300"
+                        onLoad={(e) => {
+                          console.log("Image preview loaded successfully for:", e.target.src);
+                        }}
+                        onError={(e) => {
+                          console.error("Error loading image preview:", e);
+                          console.error("Failed URL:", e.target.src);
+                          showToast("error", "Error loading image preview");
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100 border border-gray-300 rounded-lg">
+                        <p className="text-gray-500 text-sm">Loading preview...</p>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={removePoster}
                       disabled={isSubmitting}
-                      className="absolute -top-2 -right-2 bg-red-100 rounded-full p-1 hover:bg-red-200"
+                      className="absolute -top-2 -right-2 bg-red-100 rounded-full p-1 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      title="Remove image"
                     >
                       <svg
                         className="w-5 h-5 text-red-600"
@@ -624,6 +710,15 @@ function BookAuditorium() {
                         ></path>
                       </svg>
                     </button>
+                  </div>
+                )}
+                
+                {/* File Information Display */}
+                {formData.eventPoster && (
+                  <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                    <p><strong>File:</strong> {formData.eventPoster.name}</p>
+                    <p><strong>Size:</strong> {(formData.eventPoster.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>Type:</strong> {formData.eventPoster.type}</p>
                   </div>
                 )}
               </div>
