@@ -23,7 +23,7 @@ const Footer = () => {
             <h3 className="text-red-500 font-semibold mb-2">Contact Us</h3>
             <p className="text-gray-300 leading-relaxed">
               VNR Vignana Jyothi Institute of Engineering & Technology<br />
-              Bachupally, Hyderabad, Telangana - 500090
+              Bachupally, Hyderabad, Telangana - 500090, India
             </p>
             <p className="mt-2 text-gray-400">Phone: +91-040-23042758/59/60</p>
             <p className="text-gray-400">Email: info@vnrvjiet.ac.in</p>
@@ -60,7 +60,7 @@ const Footer = () => {
 
         {/* Bottom Line */}
         <div className="mt-8 pt-4 border-t border-gray-700 text-center text-gray-500">
-          &copy; {new Date().getFullYear()} VNR VJIET - Auditorium Management System. All rights reserved.
+          &copy; {new Date().getFullYear()} VNR VJIET - Auditorium Management System | All rights reserved.
         </div>
       </div>
     </footer>
