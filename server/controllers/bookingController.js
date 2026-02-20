@@ -17,6 +17,7 @@ const {
     sendBookingWithdrawalConfirmationEmail,
     sendRescheduleRequestEmail,
     sendRescheduleRequestNotificationToAdmin,
+    sendBookingCancellationEmail,
     formatDateTimeIST // Assuming this utility exists and works
 } = require('../utils/emailService'); // Verify path
 
@@ -107,12 +108,14 @@ exports.createBooking = async (req, res) => {
         const immediateConflict = await Booking.findOne({ auditorium: auditorium, status: 'approved', startTime: { $lt: validatedEndTime }, endTime: { $gt: validatedStartTime } });
         if (immediateConflict) { return res.status(409).json({ success: false, message: `The requested time slot conflicts with an existing approved booking (${immediateConflict.eventName}).` }); }
 
-        if (req.file) {
-            uploadedBlobUrl = await uploadToAzure(req.file.buffer, req.file.originalname, req.file.mimetype);
-            console.log(`[Create Booking] Azure upload successful. URL: ${uploadedBlobUrl}`);
-        } else { console.log("[Create Booking] No file uploaded."); }
 
-        const booking = new Booking({ eventName: eventName.trim(), description: description.trim(), startTime: validatedStartTime, endTime: validatedEndTime, auditorium: auditorium, department: department, user: userId, eventImages: uploadedBlobUrl ? [uploadedBlobUrl] : [], status: 'pending' });
+        let eventImages = [];
+        if (req.file) {
+            // Store path relative to /uploads/events/
+            eventImages.push(`/uploads/events/${req.file.filename}`);
+        }
+
+        const booking = new Booking({ eventName: eventName.trim(), description: description.trim(), startTime: validatedStartTime, endTime: validatedEndTime, auditorium: auditorium, department: department, user: userId, eventImages: eventImages, status: 'pending' });
         await booking.save();
         const populatedBooking = await Booking.findById(booking._id).populate('user', 'email username').populate('auditorium', 'name location').populate('department', 'name');
         if (!populatedBooking) { throw new Error("Booking created but failed to retrieve details."); }
@@ -140,7 +143,7 @@ exports.getMyBookings = async (req, res, next) => {
 // --- getAllBookings (Admin) (No changes needed) ---
 exports.getAllBookings = async (req, res, next) => {
     // ... (keep existing implementation) ...
-     try { const query = {}; const filtersApplied = {}; if (req.query.status && ['pending', 'approved', 'rejected'].includes(req.query.status.toLowerCase())) { query.status = req.query.status.toLowerCase(); filtersApplied.status = query.status; } if (req.query.auditoriumId && mongoose.Types.ObjectId.isValid(req.query.auditoriumId)) { query.auditorium = req.query.auditoriumId; filtersApplied.auditoriumId = req.query.auditoriumId; } if (req.query.departmentId && mongoose.Types.ObjectId.isValid(req.query.departmentId)) { query.department = req.query.departmentId; filtersApplied.departmentId = req.query.departmentId; } if (req.query.eventName) { query.eventName = { $regex: req.query.eventName, $options: 'i' }; filtersApplied.eventName = req.query.eventName; } if (req.query.userEmail) { const users = await User.find({ email: { $regex: req.query.userEmail, $options: 'i' } }).select('_id'); const userIds = users.map(u => u._id); if (userIds.length === 0) { return res.status(200).json({ success: true, count: 0, filtersApplied, data: [] }); } query.user = { $in: userIds }; filtersApplied.userEmail = req.query.userEmail; } if (req.query.date) { const targetDateIST = DateTime.fromISO(req.query.date, { zone: istTimezone }); if (!targetDateIST.isValid) { return res.status(400).json({ success: false, message: `Invalid date filter format: ${req.query.date}. Use YYYY-MM-DD.` }); } const startOfDayUTC = targetDateIST.startOf('day').toUTC().toJSDate(); const endOfDayUTC = targetDateIST.endOf('day').toUTC().toJSDate(); query.startTime = { $lt: endOfDayUTC }; query.endTime = { $gt: startOfDayUTC }; filtersApplied.date = req.query.date; } const bookings = await Booking.find(query).populate('user', 'username email').populate('auditorium', 'name location').populate('department', 'name code').sort({ createdAt: -1 }); res.status(200).json({ success: true, count: bookings.length, filtersApplied, data: bookings }); } catch (error) { console.error("[Error] Admin getting all bookings failed:", error); res.status(500).json({ success: false, message: 'Server error retrieving bookings.' }); }
+    try { const query = {}; const filtersApplied = {}; if (req.query.status && ['pending', 'approved', 'rejected', 'cancelled'].includes(req.query.status.toLowerCase())) { query.status = req.query.status.toLowerCase(); filtersApplied.status = query.status; } if (req.query.auditoriumId && mongoose.Types.ObjectId.isValid(req.query.auditoriumId)) { query.auditorium = req.query.auditoriumId; filtersApplied.auditoriumId = req.query.auditoriumId; } if (req.query.departmentId && mongoose.Types.ObjectId.isValid(req.query.departmentId)) { query.department = req.query.departmentId; filtersApplied.departmentId = req.query.departmentId; } if (req.query.eventName) { query.eventName = { $regex: req.query.eventName, $options: 'i' }; filtersApplied.eventName = req.query.eventName; } if (req.query.userEmail) { const users = await User.find({ email: { $regex: req.query.userEmail, $options: 'i' } }).select('_id'); const userIds = users.map(u => u._id); if (userIds.length === 0) { return res.status(200).json({ success: true, count: 0, filtersApplied, data: [] }); } query.user = { $in: userIds }; filtersApplied.userEmail = req.query.userEmail; } if (req.query.date) { const targetDateIST = DateTime.fromISO(req.query.date, { zone: istTimezone }); if (!targetDateIST.isValid) { return res.status(400).json({ success: false, message: `Invalid date filter format: ${req.query.date}. Use YYYY-MM-DD.` }); } const startOfDayUTC = targetDateIST.startOf('day').toUTC().toJSDate(); const endOfDayUTC = targetDateIST.endOf('day').toUTC().toJSDate(); query.startTime = { $lt: endOfDayUTC }; query.endTime = { $gt: startOfDayUTC }; filtersApplied.date = req.query.date; } const bookings = await Booking.find(query).populate('user', 'username email').populate('auditorium', 'name location').populate('department', 'name code').sort({ createdAt: -1 }); res.status(200).json({ success: true, count: bookings.length, filtersApplied, data: bookings }); } catch (error) { console.error("[Error] Admin getting all bookings failed:", error); res.status(500).json({ success: false, message: 'Server error retrieving bookings.' }); }
 };
 
 // --- approveBooking (Admin) (No changes needed) ---
@@ -203,7 +206,58 @@ exports.checkAvailability = async (req, res, next) => {
 };
 exports.getPublicEvents = async (req, res) => {
     // ... (keep existing implementation) ...
-     try { const nowIST = DateTime.now().setZone(istTimezone); const nowUTC = nowIST.toUTC().toJSDate(); const nextWeekIST = nowIST.plus({ days: 7 }); const nextWeekUTC = nextWeekIST.toUTC().toJSDate(); const events = await Booking.find({ status: 'approved', $or: [ { startTime: { $lte: nowUTC }, endTime: { $gte: nowUTC } }, { startTime: { $gt: nowUTC, $lt: nextWeekUTC } } ] }).sort({ startTime: 1 }).populate('auditorium', 'name').select('eventName startTime endTime auditorium eventImages description'); res.status(200).json({ success: true, data: events }); } catch (error) { console.error("[Error] Fetching public events failed:", error); res.status(500).json({ success: false, message: 'Error fetching public events.' }); }
+     try {
+        // Nearest upcoming events (including ones already ongoing) ordered by soonest startTime
+        // Added pagination support: ?page=1&limit=9 (defaults)
+        // Optional futureDays filter (?days=30) to limit how far ahead to look (defaults unlimited)
+        const nowIST = DateTime.now().setZone(istTimezone);
+        const nowUTC = nowIST.toUTC().toJSDate();
+
+        const pageParam = parseInt(req.query.page, 10);
+        const limitParam = parseInt(req.query.limit, 10);
+        const daysParam = parseInt(req.query.days, 10); // optional cap on future range
+
+        const page = (!isNaN(pageParam) && pageParam > 0) ? pageParam : 1;
+        const limit = (!isNaN(limitParam) && limitParam > 0) ? Math.min(limitParam, 50) : 9;
+
+        let timeWindowFilter = {};
+        if (!isNaN(daysParam) && daysParam > 0) {
+            const futureCutoffIST = nowIST.plus({ days: Math.min(daysParam, 365) }).endOf('day');
+            const futureCutoffUTC = futureCutoffIST.toUTC().toJSDate();
+            // Events not finished yet and starting before cutoff
+            timeWindowFilter = { endTime: { $gte: nowUTC }, startTime: { $lte: futureCutoffUTC } };
+        } else {
+            // All events not finished yet (any time in future / ongoing)
+            timeWindowFilter = { endTime: { $gte: nowUTC } };
+        }
+
+        const baseQuery = { status: 'approved', ...timeWindowFilter };
+
+        const totalCount = await Booking.countDocuments(baseQuery);
+        const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+        const safePage = Math.min(page, totalPages); // clamp if page too high
+        const skip = (safePage - 1) * limit;
+
+        const events = await Booking.find(baseQuery)
+            .sort({ startTime: 1 }) // soonest first
+            .skip(skip)
+            .limit(limit)
+            .populate('auditorium', 'name location capacity description')
+            .select('eventName startTime endTime auditorium eventImages description');
+
+        res.status(200).json({
+            success: true,
+            page: safePage,
+            limit,
+            count: events.length,
+            totalCount,
+            totalPages,
+            data: events
+        });
+    } catch (error) {
+        console.error("[Error] Fetching public events failed:", error);
+        res.status(500).json({ success: false, message: 'Error fetching public events.' });
+    }
 };
 exports.checkBookingConflicts = async (req, res) => {
     // ... (keep existing implementation) ...
@@ -246,5 +300,313 @@ exports.getPendingUpcomingBookings = async (req, res, next) => {
     } catch (error) {
         console.error("[Error] Fetching pending upcoming bookings failed:", error);
         res.status(500).json({ success: false, message: 'Server error retrieving pending upcoming bookings.' });
+    }
+};
+
+/**
+ * @desc    End an ongoing approved event immediately by setting endTime to now
+ * @route   PUT /api/bookings/:id/end
+ * @access  Private/Admin
+ */
+exports.endBookingNow = async (req, res) => {
+    const bookingId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format.' });
+    }
+
+    try {
+        const booking = await Booking.findById(bookingId)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name')
+            .populate('department', 'name');
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
+        }
+
+        if (booking.status !== 'approved') {
+            return res.status(400).json({ success: false, message: `Only approved bookings can be ended early. Current status: '${booking.status}'.` });
+        }
+
+        const nowIST = DateTime.now().setZone(istTimezone);
+        const startIST = DateTime.fromJSDate(booking.startTime).setZone(istTimezone);
+        const endIST = DateTime.fromJSDate(booking.endTime).setZone(istTimezone);
+
+        if (nowIST < startIST) {
+            return res.status(400).json({ success: false, message: 'Event has not started yet. You can only end an event after it starts.' });
+        }
+        if (nowIST >= endIST) {
+            return res.status(400).json({ success: false, message: 'Event is already over.' });
+        }
+
+        const previousEndTime = booking.endTime;
+        booking.endTime = nowIST.toUTC().toJSDate();
+        const updated = await booking.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Event ended successfully. End time set to now.',
+            data: updated,
+            meta: { previousEndTime }
+        });
+    } catch (error) {
+        console.error(`[Error] Ending booking ${bookingId} early failed:`, error);
+        return res.status(500).json({ success: false, message: 'Server error ending event.' });
+    }
+};
+
+/**
+ * @desc    Cancel an approved booking (admin action) with a required reason; notifies the user by email
+ * @route   PUT /api/bookings/:id/cancel
+ * @access  Private/Admin
+ */
+exports.cancelBooking = async (req, res) => {
+    const bookingId = req.params.id;
+    const { cancellationReason } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format.' });
+    }
+    if (!cancellationReason || !cancellationReason.trim()) {
+        return res.status(400).json({ success: false, message: 'Cancellation reason is required.' });
+    }
+
+    try {
+        const booking = await Booking.findById(bookingId)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name location')
+            .populate('department', 'name');
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: `Booking with ID ${bookingId} not found.` });
+        }
+        if (booking.status !== 'approved') {
+            return res.status(400).json({ success: false, message: `Only approved bookings can be cancelled. Current status: '${booking.status}'.` });
+        }
+
+        booking.status = 'cancelled';
+        booking.cancellationReason = cancellationReason.trim();
+        const updated = await booking.save();
+
+        // Repopulate to guarantee fields for email (some ORMs drop population on save)
+        const updatedPopulated = await Booking.findById(updated._id)
+            .populate('user', 'email username')
+            .populate('auditorium', 'name location')
+            .populate('department', 'name');
+
+        // Email the user about cancellation
+        try {
+            const userEmail = updatedPopulated?.user?.email;
+            if (userEmail) {
+                console.log(`[Email] Sending cancellation email for booking ${updated._id} to ${userEmail}`);
+                await sendBookingCancellationEmail(
+                    userEmail,
+                    updatedPopulated,
+                    updatedPopulated.auditorium,
+                    updatedPopulated.department,
+                    updatedPopulated.cancellationReason
+                );
+                console.log(`[Email] Cancellation email dispatched for booking ${updated._id}`);
+            } else {
+                console.warn(`[Email Skipped] User email missing for booking ${updated._id} cancellation.`);
+            }
+        } catch (emailError) {
+            console.error(`[Non-critical Error] Sending cancellation email failed for booking ${updated._id}:`, emailError);
+        }
+
+        return res.status(200).json({ success: true, message: 'Booking cancelled successfully.', data: updated });
+    } catch (error) {
+        console.error(`[Error] Cancelling booking ${bookingId} failed:`, error);
+        return res.status(500).json({ success: false, message: 'Server error cancelling booking.' });
+    }
+};
+
+// --- Edit Booking Details (User can edit name, description, poster for approved bookings) ---
+exports.editBookingDetails = async (req, res) => {
+    const bookingId = req.params.id;
+    const userId = req.user._id;
+    const { eventName, description } = req.body;
+    let uploadedImagePath = null;
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format.' });
+    }
+
+    try {
+        // Find the booking and verify ownership
+        const booking = await Booking.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+
+        // Check if user owns this booking
+        if (booking.user.toString() !== userId.toString()) {
+            return res.status(403).json({ success: false, message: 'Access denied. You can only edit your own bookings.' });
+        }
+
+        // Only allow editing of approved bookings
+        if (booking.status !== 'approved') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Only approved bookings can be edited. Current status: ' + booking.status 
+            });
+        }
+
+        // Check if the event has already started (no editing past events)
+        const now = new Date();
+        if (booking.startTime <= now) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot edit booking details for events that have already started or ended.' 
+            });
+        }
+
+        // Prepare update object with allowed fields only
+        const updateData = {};
+        
+        if (eventName && eventName.trim()) {
+            if (eventName.trim().length > 150) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Event name cannot exceed 150 characters.' 
+                });
+            }
+            updateData.eventName = eventName.trim();
+        }
+
+        if (description && description.trim()) {
+            if (description.trim().length > 1000) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Description cannot exceed 1000 characters.' 
+                });
+            }
+            updateData.description = description.trim();
+        }
+
+        // Handle image upload if a new poster is provided
+        if (req.file) {
+            try {
+                console.log(`[Edit Booking] Processing new poster upload for booking ${bookingId}`);
+                
+                // Validate file type and size
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowedTypes.includes(req.file.mimetype)) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.' 
+                    });
+                }
+
+                const maxSize = 5 * 1024 * 1024; // 5MB
+                if (req.file.size > maxSize) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'File size too large. Maximum size is 5MB.' 
+                    });
+                }
+
+                // Use the local file path from multer
+                const uploadedImagePath = `/uploads/events/${req.file.filename}`;
+                console.log(`[Edit Booking] New poster saved locally: ${uploadedImagePath}`);
+                
+                // Delete old image files if they exist
+                if (booking.eventImages && booking.eventImages.length > 0) {
+                    const fs = require('fs');
+                    const path = require('path');
+                    
+                    for (const oldImagePath of booking.eventImages) {
+                        try {
+                            // Convert URL path to file system path
+                            const fullPath = path.join(__dirname, '..', oldImagePath);
+                            if (fs.existsSync(fullPath)) {
+                                fs.unlinkSync(fullPath);
+                                console.log(`[Edit Booking] Deleted old poster: ${oldImagePath}`);
+                            }
+                        } catch (deleteError) {
+                            console.warn(`[Edit Booking] Failed to delete old poster ${oldImagePath}:`, deleteError.message);
+                        }
+                    }
+                }
+
+                updateData.eventImages = [uploadedImagePath];
+            } catch (uploadError) {
+                console.error(`[Edit Booking] Failed to process new poster:`, uploadError);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Failed to upload new poster. Please try again.' 
+                });
+            }
+        }
+
+        // Check if there are any updates to make
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'No valid fields provided for update.' 
+            });
+        }
+
+        // Update the booking
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            bookingId,
+            updateData,
+            { new: true, runValidators: true }
+        ).populate('user', 'username email')
+         .populate('auditorium', 'name location capacity')
+         .populate('department', 'name code');
+
+        if (!updatedBooking) {
+            // Clean up uploaded image if update failed
+            if (uploadedImagePath) {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const fullPath = path.join(__dirname, '..', uploadedImagePath);
+                    if (fs.existsSync(fullPath)) {
+                        fs.unlinkSync(fullPath);
+                    }
+                } catch (cleanupError) {
+                    console.warn(`[Edit Booking] Failed to cleanup uploaded image after update failure:`, cleanupError.message);
+                }
+            }
+            return res.status(404).json({ success: false, message: 'Booking not found during update.' });
+        }
+
+        console.log(`[Edit Booking] Successfully updated booking ${bookingId}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Booking details updated successfully.',
+            data: updatedBooking
+        });
+
+    } catch (error) {
+        console.error(`[Error] Edit booking ${bookingId} failed:`, error);
+        
+        // Clean up uploaded image if there was an error
+        if (uploadedImagePath) {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const fullPath = path.join(__dirname, '..', uploadedImagePath);
+                if (fs.existsSync(fullPath)) {
+                    fs.unlinkSync(fullPath);
+                    console.log(`[Edit Booking] Cleaned up uploaded image after error: ${uploadedImagePath}`);
+                }
+            } catch (cleanupError) {
+                console.warn(`[Edit Booking] Failed to cleanup uploaded image after error:`, cleanupError.message);
+            }
+        }
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ success: false, message: messages.join('. ') });
+        }
+
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Server error updating booking details.' 
+        });
     }
 };

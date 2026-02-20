@@ -26,10 +26,7 @@ const DepartmentSchema = new mongoose.Schema({
     timestamps: true
 });
 
-
-DepartmentSchema.index({ name: 1 });
-
-DepartmentSchema.index({ code: 1 });
+// Removed duplicate index definitions since unique: true already creates indexes
 
 
 

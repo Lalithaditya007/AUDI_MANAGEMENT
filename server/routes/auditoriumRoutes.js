@@ -1,23 +1,33 @@
 const express = require('express');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+const upload = require('../multerConfig');
 const {
     createAuditorium,
     getAllAuditoriums,
     getAuditoriumById,
     updateAuditorium,
-    deleteAuditorium
+    deleteAuditorium,
+    getAvailableAuditoriums
 } = require('../controllers/auditoriumController'); 
 const { protect, admin } = require('../middleware/authMiddleware'); 
 
 const router = express.Router();
 
+// Middleware to set uploadType for auditorium images
+function setAuditoriumUploadType(req, res, next) {
+    req.uploadType = 'auditorium';
+    next();
+}
+
 router.route('/')
-    .post(protect, admin, upload.single('image'), createAuditorium) 
+    .post(protect, admin, setAuditoriumUploadType, upload.array('images', 5), createAuditorium)
     .get(getAllAuditoriums);
+
+// Route for getting available auditoriums based on time slot
+router.route('/available')
+    .get(protect, getAvailableAuditoriums);
 
 router.route('/:id')
     .get(getAuditoriumById)
-    .put(protect, admin, updateAuditorium) 
-    .delete(protect, admin, deleteAuditorium); 
+    .put(protect, admin, setAuditoriumUploadType, upload.array('images', 5), updateAuditorium)
+    .delete(protect, admin, deleteAuditorium);
 module.exports = router;

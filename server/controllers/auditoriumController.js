@@ -31,8 +31,9 @@ exports.createAuditorium = async (req, res, next) => {
   const createdBy = body.createdBy;
   const customFields = body.customFields;
   let images = [];
-  if (req.file) {
-    images.push(`/uploads/${req.file.filename}`);
+  // Handle multiple uploaded files (multer's upload.array)
+  if (req.files && req.files.length > 0) {
+    images = req.files.map(file => `/uploads/auditorium/${file.filename}`);
   } else if (body.images) {
     // fallback for JSON
     images = Array.isArray(body.images) ? body.images : [body.images];
@@ -107,6 +108,86 @@ exports.getAllAuditoriums = async (req, res, next) => {
   }
 };
 
+exports.getAvailableAuditoriums = async (req, res, next) => {
+  const { startTime, endTime } = req.query;
+
+  // Validate required parameters
+  if (!startTime || !endTime) {
+    return res.status(400).json({
+      success: false,
+      message: 'Both startTime and endTime are required parameters'
+    });
+  }
+
+  try {
+    // Parse and validate dates
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format for startTime or endTime'
+      });
+    }
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'startTime must be before endTime'
+      });
+    }
+
+    // Get all auditoriums
+    const allAuditoriums = await Auditorium.find({ available: true }).sort({ name: 1 });
+
+    // Find auditoriums that have conflicting bookings in the requested time slot
+    const conflictingBookings = await Booking.find({
+      status: { $in: ['approved', 'pending'] }, // Consider both approved and pending bookings
+      $or: [
+        {
+          // Booking starts during the requested slot
+          startTime: { $gte: start, $lt: end }
+        },
+        {
+          // Booking ends during the requested slot  
+          endTime: { $gt: start, $lte: end }
+        },
+        {
+          // Booking completely encompasses the requested slot
+          startTime: { $lte: start },
+          endTime: { $gte: end }
+        }
+      ]
+    }).select('auditorium');
+
+    // Get IDs of auditoriums with conflicts
+    const conflictingAuditoriumIds = conflictingBookings.map(booking => booking.auditorium.toString());
+
+    // Filter out auditoriums with conflicts
+    const availableAuditoriums = allAuditoriums.filter(auditorium => 
+      !conflictingAuditoriumIds.includes(auditorium._id.toString())
+    );
+
+    res.status(200).json({
+      success: true,
+      count: availableAuditoriums.length,
+      data: availableAuditoriums,
+      requestedSlot: {
+        startTime: start.toISOString(),
+        endTime: end.toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error("Error getting available auditoriums:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while retrieving available auditoriums.' 
+    });
+  }
+};
+
 exports.getAuditoriumById = async (req, res, next) => {
   const auditoriumId = req.params.id;
 
@@ -142,7 +223,7 @@ exports.getAuditoriumById = async (req, res, next) => {
 
 exports.updateAuditorium = async (req, res, next) => {
   const auditoriumId = req.params.id;
-  const updateData = req.body;
+  let updateData = req.body;
   // Only allow fields defined in schema
   const allowedFields = [
     'name', 'capacity', 'location', 'description', 'amenities', 'images', 'available', 'createdBy', 'contactInfo', 'customFields', 'size'
@@ -152,6 +233,30 @@ exports.updateAuditorium = async (req, res, next) => {
       delete updateData[key];
     }
   });
+
+  // Handle amenities and size for multipart form data
+  if (Array.isArray(updateData.amenities)) {
+    updateData.amenities = updateData.amenities.flat().map(a => a.trim()).filter(Boolean);
+  } else if (typeof updateData.amenities === 'string') {
+    updateData.amenities = updateData.amenities.split(',').map(a => a.trim()).filter(Boolean);
+  }
+  if (Array.isArray(updateData.size)) {
+    updateData.size = updateData.size.find(s => typeof s === 'string' && s.length > 0) || '';
+  }
+
+  // Handle multiple uploaded files (multer's upload.array)
+  // Merge existing images provided in the body with newly uploaded files
+  const existingImagesFromBody = updateData.images
+    ? (Array.isArray(updateData.images) ? updateData.images : [updateData.images])
+    : [];
+  const uploadedImages = (req.files && req.files.length > 0)
+    ? req.files.map(file => `/uploads/auditorium/${file.filename}`)
+    : [];
+  if (existingImagesFromBody.length > 0 || uploadedImages.length > 0) {
+    // Deduplicate while preserving order
+    const merged = [...existingImagesFromBody, ...uploadedImages];
+    updateData.images = Array.from(new Set(merged));
+  }
 
   // Validate ID format
   if (!mongoose.Types.ObjectId.isValid(auditoriumId)) {

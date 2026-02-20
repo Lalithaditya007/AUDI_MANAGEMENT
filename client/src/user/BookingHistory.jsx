@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
 import { format, parseISO } from 'date-fns';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -32,7 +31,7 @@ function debounce(func, wait) {
 function BookingHistory() {
   const modalStartTimeRef = useRef(null);
   const modalEndTimeRef = useRef(null);
-  const navigate = useNavigate(); // Included navigate
+  // Note: navigate not used in this component
 
   // --- State Definitions ---
   const [bookings, setBookings] = useState([]);
@@ -63,6 +62,20 @@ function BookingHistory() {
   const [isModalSlotAvailable, setIsModalSlotAvailable] = useState(true);
   const [modalConflictDetails, setModalConflictDetails] = useState(null); // Stores conflict info
 
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editBooking, setEditBooking] = useState(null);
+  const [editEventName, setEditEventName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPoster, setEditPoster] = useState(null);
+  const [editPosterPreview, setEditPosterPreview] = useState(null);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  // Pagination State
+  const PAGE_SIZE = 10; // show 10 bookings per page
+  const [currentPage, setCurrentPage] = useState(1);
+
   // --- Constants ---
   const bookingLeadTimeHours = 2; // Configurable lead time
 
@@ -85,7 +98,7 @@ function BookingHistory() {
   };
 
   const getMinDateTimeLocalString = useCallback(() => {
-    try { const now = new Date(); const minDate = new Date(now.getTime() + (bookingLeadTimeHours || 2) * 36e5); const localMinDt = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000); return localMinDt.toISOString().slice(0, 16); } catch (e) { const now=new Date(); const localNow=new Date(now.getTime()-now.getTimezoneOffset()*60000); return localNow.toISOString().slice(0,16); }
+    try { const now = new Date(); const minDate = new Date(now.getTime() + (bookingLeadTimeHours || 2) * 36e5); const localMinDt = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000); return localMinDt.toISOString().slice(0, 16); } catch { const now=new Date(); const localNow=new Date(now.getTime()-now.getTimezoneOffset()*60000); return localNow.toISOString().slice(0,16); }
   }, [bookingLeadTimeHours]);
 
   // Add this function to handle time changes
@@ -155,7 +168,7 @@ function BookingHistory() {
         try {
           const d=await res.json();
           m=d.message||m;
-        } catch (e){}
+        } catch { void 0; }
         throw new Error(m);
       }
       const data=await res.json();
@@ -199,14 +212,23 @@ function BookingHistory() {
 
   useEffect(() => { // Filtering Logic
      const filtered = bookings.filter(b => { const lT = searchTerm.toLowerCase(); const sM=!searchTerm || (b.eventName?.toLowerCase().includes(lT)) || (b.description?.toLowerCase().includes(lT)); const stM = filterStatus === "all" || b.status === filterStatus; const aM = filterAuditorium === "all" || b.auditorium?.name === filterAuditorium; const dM = filterDepartment === "all" || b.department?._id === filterDepartment; const dtM = !filterDate || (b.startTime && format(parseISO(b.startTime), 'yyyy-MM-dd') === filterDate); return sM&&stM&&aM&&dM&&dtM; }); setFilteredBookings(filtered);
+     setCurrentPage(1); // reset to first page when filters change
    }, [bookings, searchTerm, filterStatus, filterAuditorium, filterDepartment, filterDate]);
+
+  // Clamp current page if filtered results shrink
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredBookings, currentPage]);
 
   const debouncedModalCheck = useMemo(() => debounce(checkAvailability, 750), [checkAvailability]); // Debounced check
 
   useEffect(() => { // Trigger Modal Check
      let isActive=true; if (isRescheduleModalOpen && modalStartTime && modalEndTime && rescheduleBooking?._id && rescheduleBooking?.auditorium?._id) {
        try { const start=new Date(modalStartTime), end=new Date(modalEndTime); if (!isNaN(start)&&!isNaN(end)&&start<end) { debouncedModalCheck(modalStartTime, modalEndTime, rescheduleBooking.auditorium._id, rescheduleBooking._id); } else { if (isActive) { setIsModalSlotAvailable(false); setModalConflictDetails(null); setModalAvailabilityError("Valid time required."); setIsCheckingModalAvailability(false); }}}
-       catch(e) { if (isActive) { setIsModalSlotAvailable(false); setModalConflictDetails(null); setModalAvailabilityError("Invalid date format."); setIsCheckingModalAvailability(false); }}}
+  catch { if (isActive) { setIsModalSlotAvailable(false); setModalConflictDetails(null); setModalAvailabilityError("Invalid date format."); setIsCheckingModalAvailability(false); }}}
      else if (isRescheduleModalOpen) { if(isActive) { setIsModalSlotAvailable(true); setModalConflictDetails(null); setModalAvailabilityError(""); setIsCheckingModalAvailability(false); }}
      return () => {isActive=false;};
   }, [modalStartTime, modalEndTime, rescheduleBooking, isRescheduleModalOpen, debouncedModalCheck]);
@@ -226,7 +248,7 @@ function BookingHistory() {
       });
     }
   }, [isModalSlotAvailable, isCheckingModalAvailability, isSubmittingReschedule,
-      modalStartTime, modalEndTime, rescheduleBooking]);
+      modalStartTime, modalEndTime, rescheduleBooking, isRescheduleModalOpen]);
 
   useEffect(() => { return () => { /* Cleanup on unmount */ }; }, []);
 
@@ -351,6 +373,159 @@ function BookingHistory() {
     }
   };
 
+  // --- Edit Modal Handlers ---
+  const openEditModal = (booking) => {
+    if (isSubmittingEdit) return;
+    
+    // Only allow editing of approved bookings that haven't started yet
+    if (booking.status !== 'approved') {
+      showToast("error", "Only approved bookings can be edited.");
+      return;
+    }
+    
+    const now = new Date();
+    const eventStart = booking.startTime ? new Date(booking.startTime) : null;
+    if (!eventStart || eventStart <= now) {
+      showToast("error", "Cannot edit bookings for events that have already started or ended.");
+      return;
+    }
+    
+    setEditBooking(booking);
+    setEditEventName(booking.eventName || "");
+    setEditDescription(booking.description || "");
+    setEditPoster(null);
+    setEditError("");
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setTimeout(() => {
+      // Clean up preview URL to prevent memory leaks
+      if (editPosterPreview) {
+        URL.revokeObjectURL(editPosterPreview);
+      }
+      setEditBooking(null);
+      setEditEventName("");
+      setEditDescription("");
+      setEditPoster(null);
+      setEditPosterPreview(null);
+      setEditError("");
+    }, 300);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editBooking || isSubmittingEdit) return;
+    
+    // Check if any changes were made
+    const hasChanges = 
+      editEventName.trim() !== editBooking.eventName ||
+      editDescription.trim() !== editBooking.description ||
+      editPoster !== null;
+    
+    if (!hasChanges) {
+      showToast("warning", "No changes detected.");
+      return;
+    }
+    
+    setEditError("");
+    setIsSubmittingEdit(true);
+    
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      showToast("error", "Authentication required. Please log in again.");
+      setIsSubmittingEdit(false);
+      return;
+    }
+    
+    try {
+      const formData = new FormData();
+      
+      if (editEventName.trim() !== editBooking.eventName) {
+        formData.append('eventName', editEventName.trim());
+      }
+      
+      if (editDescription.trim() !== editBooking.description) {
+        formData.append('description', editDescription.trim());
+      }
+      
+      if (editPoster) {
+        formData.append('eventPoster', editPoster);
+      }
+      
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/${editBooking._id}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || `Update failed (${response.status})`);
+      }
+      
+      showToast("success", data.message || "Booking details updated successfully!");
+      
+      // Update the booking in local state
+      setBookings(prev => prev.map(b => 
+        b._id === editBooking._id ? { ...b, ...data.data, id: data.data._id } : b
+      ));
+      
+      closeEditModal();
+      
+    } catch (err) {
+      console.error("Edit booking error:", err);
+      setEditError(err.message || "Failed to update booking details");
+      showToast("error", err.message || "Failed to update booking details");
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleEditPosterChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      setEditPoster(null);
+      setEditPosterPreview(null);
+      return;
+    }
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast("error", "Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.");
+      e.target.value = null;
+      return;
+    }
+    
+    // Validate file size (5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      showToast("error", "File size too large. Maximum size is 5MB.");
+      e.target.value = null;
+      return;
+    }
+    
+    setEditPoster(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setEditPosterPreview(previewUrl);
+  };
+
+  const removeEditPoster = () => {
+    setEditPoster(null);
+    const fileInput = document.querySelector('input[name="editEventPoster"]');
+    if (fileInput) fileInput.value = null;
+  };
+
   // --- Render Component UI ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
@@ -404,22 +579,25 @@ function BookingHistory() {
               <div className="text-center py-16"> <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> <h3 className="mt-2 text-sm font-medium text-gray-900">{bookings.length === 0 ? "No bookings found" : "No bookings match filters"}</h3> <p className="mt-1 text-sm text-gray-500">{bookings.length === 0 ? "No requests yet." : "Try adjusting filters."}</p> </div>
              ) : (
               <div className="space-y-6">
-                {filteredBookings.map((booking) => {
-                    const eventStart = booking.startTime ? parseISO(booking.startTime) : null; const now = new Date(); const minReqTime = new Date(now.getTime()+(bookingLeadTimeHours||2)*36e5); const canWdTime=eventStart&&eventStart>minReqTime; const wdAllowed = booking.status==='pending'||(booking.status==='approved'&&canWdTime); const rsAllowed = booking.status==='approved'&&eventStart&&eventStart>now;
+                {(() => {
+                  const start = (currentPage - 1) * PAGE_SIZE;
+                  const pageItems = filteredBookings.slice(start, start + PAGE_SIZE);
+                  return pageItems.map((booking) => {
+                    const eventStart = booking.startTime ? parseISO(booking.startTime) : null; const now = new Date(); const minReqTime = new Date(now.getTime()+(bookingLeadTimeHours||2)*36e5); const canWdTime=eventStart&&eventStart>minReqTime; const wdAllowed = booking.status==='pending'||(booking.status==='approved'&&canWdTime); const rsAllowed = booking.status==='approved'&&eventStart&&eventStart>now; const editAllowed = booking.status==='approved'&&eventStart&&eventStart>now;
                     
                     // --- CORRECTED IMAGE URL LOGIC ---
                     const imagePath = booking.eventImages?.[0];
-                    // Use the full Azure URL directly if it starts with http
-                    const imgUrl = imagePath && imagePath.startsWith('http') ? imagePath : null; 
+                    // Support both local paths (/uploads/...) and external URLs (http...)
+                    const imgUrl = imagePath ? imagePath : null; 
                     // --- END CORRECTION ---
 
-                    const actInProgress=!!(withdrawingId||isSubmittingReschedule); const thisWdProgress=withdrawingId===booking._id;
+                    const actInProgress=!!(withdrawingId||isSubmittingReschedule||isSubmittingEdit); const thisWdProgress=withdrawingId===booking._id;
                     return (
                         <div key={booking._id} className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sm:p-6 overflow-hidden hover:shadow-md transition-shadow duration-200">
                             <div className="flex flex-col md:flex-row gap-5 items-start">
                                 {/* Image */}
                                 <div className={`flex-shrink-0 w-full md:w-44 h-44 rounded-lg shadow bg-gray-100 flex items-center justify-center overflow-hidden text-gray-400 relative ${imgUrl ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`} onClick={() => imgUrl && setZoomedImageUrl(imgUrl)} title={imgUrl ? "Zoom Poster" : "No Poster"}>
-                                    {imgUrl ? (<img src={imgUrl} alt={`${booking.eventName || "Event"} Poster`} className="w-full h-full object-cover" onError={(e)=>{if(e.target.src!==ERROR_IMAGE_URL){e.target.onerror=null; e.target.src=ERROR_IMAGE_URL;}}} loading="lazy"/>) : (<ImagePlaceholderIcon />)}
+                                    {imgUrl ? (<img src={imgUrl.startsWith('http') ? imgUrl : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${imgUrl}`} alt={`${booking.eventName || "Event"} Poster`} className="w-full h-full object-cover" onError={(e)=>{if(e.target.src!==ERROR_IMAGE_URL){e.target.onerror=null; e.target.src=ERROR_IMAGE_URL;}}} loading="lazy"/>) : (<ImagePlaceholderIcon />)}
                                 </div>
                                 {/* Details */}
                                 <div className="flex-1 min-w-0 space-y-2.5">
@@ -430,7 +608,7 @@ function BookingHistory() {
                                     {/* Info List */}
                                     <div className="text-xs sm:text-sm text-gray-500 space-y-1.5 border-t border-gray-100 pt-2.5 mt-2.5"> <p><strong className="font-medium text-gray-700 w-20 inline-block">When:</strong> {booking.startTime ? format(parseISO(booking.startTime), 'MMM d, yyyy, h:mm a') : "N/A"} - {booking.endTime ? format(parseISO(booking.endTime), 'h:mm a') : "N/A"}</p> <p><strong className="font-medium text-gray-700 w-20 inline-block">Where:</strong> {booking.auditorium?.name ?? <span className="italic">N/A</span>}{booking.auditorium?.location && ` (${booking.auditorium.location})`}</p> <p><strong className="font-medium text-gray-700 w-20 inline-block">Dept:</strong> {booking.department?.name ?? <span className="italic">N/A</span>}{booking.department?.code && ` (${booking.department.code})`}</p> {booking.status==="rejected" && booking.rejectionReason && (<blockquote className="mt-2 pl-3 border-l-4 border-red-300 bg-red-50 text-red-800 text-xs italic py-1"><strong className="not-italic font-medium text-red-900">Reason:</strong> {booking.rejectionReason}</blockquote>)} </div>
                                     {/* Action Buttons */}
-                                    {(wdAllowed || rsAllowed) && (
+                                    {(wdAllowed || rsAllowed || editAllowed) && (
                                         <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 mt-3">
                                         {wdAllowed && (
                                             <button
@@ -442,16 +620,224 @@ function BookingHistory() {
                                             </button>
                                         )}
                                         {rsAllowed && <button onClick={()=>openRescheduleModal(booking._id)} disabled={actInProgress} className="px-3 py-1.5 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition">Request Reschedule</button>}
+                                        {editAllowed && (
+                                            <button
+                                                onClick={() => openEditModal(booking)}
+                                                disabled={actInProgress}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                            >
+                                                Edit Details
+                                            </button>
+                                        )}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
                     );
-                 })}
+                 });
+                })()}
+
+                {/* Pagination Controls */}
+                {filteredBookings.length > 0 && (
+                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    {/* Showing range */}
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+                        const endIdx = Math.min(filteredBookings.length, currentPage * PAGE_SIZE);
+                        return (
+                          <span>
+                            Showing <strong>{startIdx}</strong>–<strong>{endIdx}</strong> of <strong>{filteredBookings.length}</strong>
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Pager */}
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        disabled={currentPage === 1}
+                        onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        Previous
+                      </button>
+                      {(() => {
+                        const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+                        const pages = [];
+                        const span = 2;
+                        const start = Math.max(1, currentPage - span);
+                        const end = Math.min(totalPages, currentPage + span);
+                        if (start > 1) pages.push(1);
+                        if (start > 2) pages.push('ellipsis-start');
+                        for (let p = start; p <= end; p++) pages.push(p);
+                        if (end < totalPages - 1) pages.push('ellipsis-end');
+                        if (end < totalPages) pages.push(totalPages);
+                        return pages.map((p, idx) =>
+                          typeof p === 'number' ? (
+                            <button
+                              key={idx}
+                              className={`px-3 py-1.5 text-sm rounded border ${p === currentPage ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+                              onClick={() => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                            >
+                              {p}
+                            </button>
+                          ) : (
+                            <span key={idx} className="px-2 text-gray-400">…</span>
+                          )
+                        );
+                      })()}
+                      <button
+                        className="px-3 py-1.5 text-sm rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        disabled={currentPage >= Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE))}
+                        onClick={() => { setCurrentPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
              )}
           </>
+        )}
+
+        {/* --- Edit Modal --- */}
+        {isEditModalOpen && editBooking && (
+            <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 p-4">
+                <div className="bg-white/90 backdrop-blur-lg rounded-lg shadow-xl border border-white/20 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white/95 backdrop-blur-sm p-6 border-b border-white/30 rounded-t-lg">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                Edit Event Details
+                            </h3>
+                            <button
+                                onClick={closeEditModal}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                disabled={isSubmittingEdit}
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="p-6">
+                        {editError && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                                <p className="text-sm text-red-600">{editError}</p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleEditSubmit} className="space-y-4">
+                            {/* Event Name */}
+                            <div>
+                                <label htmlFor="editEventName" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Event Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    id="editEventName"
+                                    value={editEventName}
+                                    onChange={(e) => setEditEventName(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Enter event name"
+                                    disabled={isSubmittingEdit}
+                                    required
+                                />
+                            </div>
+
+                            {/* Event Description */}
+                            <div>
+                                <label htmlFor="editDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Description *
+                                </label>
+                                <textarea
+                                    id="editDescription"
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    rows={4}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                    placeholder="Enter event description"
+                                    disabled={isSubmittingEdit}
+                                    required
+                                />
+                            </div>
+
+                            {/* Event Poster */}
+                            <div>
+                                <label htmlFor="editPoster" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Event Poster
+                                </label>
+                                <input
+                                    type="file"
+                                    id="editPoster"
+                                    accept="image/*"
+                                    onChange={handleEditPosterChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    disabled={isSubmittingEdit}
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Leave empty to keep current poster. Max size: 5MB. Formats: JPG, PNG, GIF
+                                </p>
+                                
+                                {/* Image previews */}
+                                <div className="mt-2 flex gap-4">
+                                    {editBooking?.eventImages?.[0] && (
+                                        <div>
+                                            <p className="text-xs text-gray-600 mb-1">Current poster:</p>
+                                            <img
+                                                src={`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${editBooking.eventImages[0]}`}
+                                                alt="Current poster"
+                                                className="w-20 h-20 object-cover rounded border border-gray-200"
+                                            />
+                                        </div>
+                                    )}
+                                    {editPosterPreview && (
+                                        <div>
+                                            <p className="text-xs text-gray-600 mb-1">New poster preview:</p>
+                                            <img
+                                                src={editPosterPreview}
+                                                alt="New poster preview"
+                                                className="w-20 h-20 object-cover rounded border border-green-300"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Locked fields info */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                <p className="text-sm text-blue-800">
+                                    <strong>Note:</strong> Event time and department cannot be changed after approval. 
+                                    To modify these, please contact the admin.
+                                </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={closeEditModal}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    disabled={isSubmittingEdit}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={isSubmittingEdit}
+                                >
+                                    {isSubmittingEdit ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         )}
 
         {/* --- Reschedule Modal --- */}
@@ -492,7 +878,7 @@ function BookingHistory() {
         )}
 
         {/* --- Image Zoom Modal --- */}
-        {zoomedImageUrl && ( <div className="fixed inset-0 z-[60] bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setZoomedImageUrl(null)}> <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden"> <img src={zoomedImageUrl} alt="Zoomed Poster" className="block max-w-full max-h-[90vh] object-contain mx-auto my-auto" onClick={(e)=>e.stopPropagation()}/> <button onClick={()=>setZoomedImageUrl(null)} className="absolute top-2 right-2 bg-white/70 hover:bg-white rounded-full p-1"><svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" /></svg></button> </div> </div> )}
+  {zoomedImageUrl && ( <div className="fixed inset-0 z-[60] bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setZoomedImageUrl(null)}> <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden"> <img src={zoomedImageUrl.startsWith('http') ? zoomedImageUrl : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${zoomedImageUrl}`} alt="Zoomed Poster" className="block max-w-full max-h-[90vh] object-contain mx-auto my-auto" onClick={(e)=>e.stopPropagation()}/> <button onClick={()=>setZoomedImageUrl(null)} className="absolute top-2 right-2 bg-white/70 hover:bg-white rounded-full p-1"><svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" /></svg></button> </div> </div> )}
 
         {/* Withdraw Confirmation Modal */}
         {showWithdrawModal && withdrawBooking && (

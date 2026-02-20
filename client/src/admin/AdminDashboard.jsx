@@ -1,12 +1,12 @@
-  import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
-import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
+import {  AnimatePresence,motion} from "framer-motion"; // Added AnimatePresence
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
-import AddAuditorium from '../pages/Audis/AddAuditorium';
+// import AddAuditorium from '../pages/Audis/AddAuditorium';
 
 // --- Helper Components (Keep existing StatsCard, TrendChart) ---
 function StatsCard({ title, value, color = "text-gray-900" }) { /* ... existing code ... */ 
@@ -61,7 +61,7 @@ const AdminDashboard = () => {
 
   // --- API Fetching Helper (No changes needed) ---
   const fetchData = useCallback(async (url, token, signal) => { /* ... existing code ... */ 
-    console.log(`[API Call] Fetching from ${url}`); try { const response = await fetch(url, { signal, headers: { Authorization: `Bearer ${token}`, Accept: "application/json", }, }); let data; const contentType = response.headers.get("content-type"); if (contentType?.includes("application/json")) { data = await response.json(); } else { const text = await response.text(); if (!response.ok) { throw new Error(`Server Error ${response.status}: ${text.substring(0, 150)}...`); } else { console.warn(`[API Warning] Received non-JSON success response from ${url}`); return null; } } if (!response.ok) { throw new Error(data.message || `Fetch failed: ${response.status}`); } if (data.success && data.hasOwnProperty('data')) { console.log(`[API Response] Success from ${url}`); return data.data; } else { throw new Error(data.message || "Invalid data structure received."); } } catch (error) { if (error.name === 'AbortError') { console.log('Fetch aborted:', url); return undefined; } else { console.error(`[Fetch Error] from ${url}:`, error); throw error; } }
+  console.log(`[API Call] Fetching from ${url}`); try { const response = await fetch(url, { signal, headers: { Authorization: `Bearer ${token}`, Accept: "application/json", }, }); let data; const contentType = response.headers.get("content-type"); if (contentType?.includes("application/json")) { data = await response.json(); } else { const text = await response.text(); if (!response.ok) { throw new Error(`Server Error ${response.status}: ${text.substring(0, 150)}...`); } else { console.warn(`[API Warning] Received non-JSON success response from ${url}`); return null; } } if (!response.ok) { throw new Error(data.message || `Fetch failed: ${response.status}`); } if (data.success && Object.prototype.hasOwnProperty.call(data, 'data')) { console.log(`[API Response] Success from ${url}`); return data.data; } else { throw new Error(data.message || "Invalid data structure received."); } } catch (error) { if (error.name === 'AbortError') { console.log('Fetch aborted:', url); return undefined; } else { console.error(`[Fetch Error] from ${url}:`, error); throw error; } }
   }, []);
 
   // --- UseEffect Hooks for Data Fetching ---
@@ -171,47 +171,60 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-900">
+  <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-900 mt-20">
           Admin Dashboard
         </h1>
 
         {/* Quick Actions Bar */}
-        <div className="mb-6 flex flex-wrap gap-4">
-          <Link
-            to="/admin/create-user"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+  <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <button
+            onClick={() => navigate('/admin/manage-users')}
+            className="group bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ease-in-out"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Create New User
-          </Link>
-          <Link
-            to="/manage-bookings"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11c1.104 0 2-.896 2-2s-.896-2-2-2-2 .896-2 2 .896 2 2 2zm-8 0c1.104 0 2-.896 2-2s-.896-2-2-2-2 .896-2 2 .896 2 2 2zm8 2c-2.21 0-4 1.79-4 4v1h8v-1c0-2.21-1.79-4-4-4zm-8 0c-2.21 0-4 1.79-4 4v1h8v-1c0-2.21-1.79-4-4-4z" />
+              </svg>
+              <span>Manage Users</span>
+            </div>
+          </button>
+          {/* Removed Create New User button as requested */}
+
+          <button
+            onClick={() => navigate('/manage-bookings')}
+            className="group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ease-in-out"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Manage Bookings
-          </Link>
-          <Link
-            to="/admin/schedule-viewer"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span>Manage Bookings</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/schedule-viewer')}
+            className="group bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ease-in-out"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            View Schedule
-          </Link>
-          <div className="flex justify-end mb-6">
-            <button
-              className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
-              onClick={() => navigate('/admin/add-auditorium')}
-            >
-              Add New Auditorium
-            </button>
-          </div>
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>View Schedule</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/manage-auditoriums')}
+            className="group bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ease-in-out"
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <span>Manage Auditoriums</span>
+            </div>
+          </button>
         </div>
 
         {/* Initial Loading Indicator */}
@@ -235,7 +248,7 @@ const AdminDashboard = () => {
             {/* Row 2: Pie Chart & Upcoming Events */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                {/* Pie Chart */}
-               <div className="bg-white p-4 sm:p-6 rounded-lg shadow min-h-[400px] flex flex-col"> <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-700 flex-shrink-0"> Request Distribution </h2> <div className="flex-grow flex items-center justify-center"> {isLoadingStats && (<p>Loading chart...</p>)} {statsError && !isLoadingStats && (<p>Error loading stats</p>)} {!isLoadingStats && !statsError && pieData.length === 0 && (<p>No request data</p>)} {!isLoadingStats && !statsError && pieData.length > 0 && ( <ResponsiveContainer width="99%" height={300}> <PieChart> <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={50} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}> {pieData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={entry.color || PIE_COLORS[index % PIE_COLORS.length]} /> ))} </Pie> <Tooltip formatter={(value) => value?.toLocaleString() ?? ''} /> <Legend iconSize={10} verticalAlign="bottom" height={36} /> </PieChart> </ResponsiveContainer> )} </div> </div>
+               <div className="bg-white p-4 sm:p-6 rounded-lg shadow min-h-[400px] flex flex-col"> <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-700 flex-shrink-0"> Request Distribution </h2> <div className="flex-grow flex items-center justify-center"> {isLoadingStats && (<p>Loading chart...</p>)} {statsError && !isLoadingStats && (<p>Error loading stats</p>)} {!isLoadingStats && !statsError && pieData.length === 0 && (<p>No request data</p>)} {!isLoadingStats && !statsError && pieData.length > 0 && ( <ResponsiveContainer width="99%" height={300}> <PieChart tabIndex={-1} style={{outline:'none',border:'none'}}> <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={50} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}> {pieData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={entry.color || PIE_COLORS[index % PIE_COLORS.length]} /> ))} </Pie> <Tooltip formatter={(value) => value?.toLocaleString() ?? ''} /> <Legend iconSize={10} verticalAlign="bottom" height={36} /> </PieChart> </ResponsiveContainer> )} </div> </div>
                {/* Upcoming Events */}
                <div className="bg-white p-4 sm:p-6 rounded-lg shadow h-[400px] flex flex-col"> <div className="flex justify-between items-center mb-4 flex-shrink-0 flex-wrap gap-2"> <h2 className="text-lg sm:text-xl font-semibold text-gray-700 whitespace-nowrap"> Upcoming Events </h2> <div className="flex items-center gap-1 sm:gap-2 flex-wrap"> <span className="text-xs text-gray-500">Next:</span> {[3, 7, 14].map(dayOption => ( <button key={dayOption} onClick={() => setUpcomingDays(dayOption)} disabled={isLoadingUpcoming} className={`px-2 py-0.5 text-xs rounded ${upcomingDays === dayOption ? 'bg-red-600 text-white font-semibold shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} disabled:opacity-50 transition-colors duration-150`}> {dayOption}d </button> ))} <Link to="/admin/schedule-viewer" className="text-sm font-medium text-red-600 hover:text-red-800 hover:underline ml-1 sm:ml-2 whitespace-nowrap"> Full Schedule → </Link> </div> </div> <div className="flex-grow overflow-hidden relative"> {isLoadingUpcoming && (<div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50 z-10"><p>Loading...</p></div>)} {upcomingError && !isLoadingUpcoming && (<div className="absolute inset-0 flex items-center justify-center p-4"><p>Error: {upcomingError}</p></div>)} {!isLoadingUpcoming && !upcomingError && upcomingBookings.length === 0 && (<div className="absolute inset-0 flex items-center justify-center"><p>No upcoming events.</p></div>)} <ul className="divide-y divide-gray-100 h-full overflow-y-auto pr-1"> {!isLoadingUpcoming && !upcomingError && upcomingBookings.map(booking => ( <li key={booking._id} className="py-2.5 px-1"> <div className="flex items-start justify-between gap-2"> <div className="flex-1 min-w-0"> <p className="text-sm font-medium text-gray-800 truncate" title={booking.eventName}> {booking.eventName || 'N/A Event'} </p> <p className="text-xs text-gray-500 truncate" title={`In: ${booking.auditorium?.name || 'N/A'} | Dept: ${booking.department?.name || 'N/A'}`}> In: {booking.auditorium?.name || 'N/A'} | Dept: {booking.department?.name || 'N/A'} </p> </div> <div className="text-xs text-gray-600 flex-shrink-0 text-right space-y-0.5"> <p className="font-medium">{formatRelativeDate(booking.startTime)}</p> <p className="text-gray-500"> {format(parseISO(booking.startTime), 'h:mm a')} - {format(parseISO(booking.endTime), 'h:mm a')} </p> </div> </div> </li> ))} </ul> </div> </div>
             </div>

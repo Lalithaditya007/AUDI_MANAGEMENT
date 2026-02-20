@@ -30,13 +30,70 @@ const UserSchema = new mongoose.Schema({
         enum: ['user', 'admin'], // Allowed roles
         default: 'user', // Default role is 'user'
     },
+    // Profile fields
+    profile: {
+        firstName: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        lastName: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        fullName: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        department: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        contact: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        profilePicture: {
+            type: String,
+            default: null,
+        },
+        bio: {
+            type: String,
+            maxlength: 500,
+            default: '',
+        },
+        position: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+    },
+    // Timestamps
     createdAt: { // Keep track of when the user registered
+        type: Date,
+        default: Date.now,
+    },
+    updatedAt: {
         type: Date,
         default: Date.now,
     },
 });
 
+// Pre-save middleware to update timestamps and handle profile data
 UserSchema.pre('save', async function(next){
+    // Update the updatedAt field
+    this.updatedAt = new Date();
+    
+    // Generate fullName from firstName and lastName if they exist
+    if (this.profile.firstName || this.profile.lastName) {
+        this.profile.fullName = `${this.profile.firstName} ${this.profile.lastName}`.trim();
+    }
+    
+    // Handle password hashing
     if(!this.isModified('password')) return next(); // If password is not modified, skip hashing
     try{
         const salt = await bcrypt.genSalt(10); 
@@ -45,7 +102,6 @@ UserSchema.pre('save', async function(next){
     }catch(err){
         next(err);
     }
-    
 })
 
 UserSchema.methods.matchPassword = async function(enteredPassword){

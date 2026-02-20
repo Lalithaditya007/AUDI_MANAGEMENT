@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const AddAuditorium = () => {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: '',
     capacity: '',
@@ -45,19 +49,19 @@ const AddAuditorium = () => {
     setError(null);
     setSuccess(false);
     try {
-  // Determine size based on capacity
-  let size = '';
-  const cap = Number(form.capacity);
-  if (cap < 200) size = 'small';
-  else if (cap < 400) size = 'medium';
-  else size = 'large';
+      // Determine size based on capacity
+      let size = '';
+      const cap = Number(form.capacity);
+      if (cap < 200) size = 'small';
+      else if (cap < 400) size = 'medium';
+      else size = 'large';
 
-  const formData = new FormData();
+      const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
         formData.append(key, value);
       });
-  formData.append('size', size);
-  formData.append('amenities', form.amenities.split(',').map(a => a.trim()));
+      formData.append('size', size);
+      formData.append('amenities', form.amenities.split(',').map(a => a.trim()));
       if (imageFile) {
         formData.append('image', imageFile);
       }
@@ -75,6 +79,11 @@ const AddAuditorium = () => {
       });
       setImageFile(null);
       setImagePreview('');
+      // Show notification and redirect to admin dashboard
+      toast.success('Auditorium created successfully!');
+      setTimeout(() => {
+        navigate('/admin-dashboard');
+      }, 1500);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -84,6 +93,7 @@ const AddAuditorium = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f7f7f7] px-4 py-10">
+      <ToastContainer position="top-center" autoClose={1500} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
       <div className="max-w-xl w-full backdrop-blur-lg bg-white/30 border border-white/40 rounded-2xl shadow-2xl p-8 relative">
         <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{boxShadow: '0 8px 32px 0 rgba(130,24,26,0.15)', border: '1px solid rgba(255,255,255,0.18)'}}></div>
         <h2 className="text-4xl font-extrabold mb-8 text-[#82181A] text-center drop-shadow-lg tracking-tight">Add New Auditorium</h2>
@@ -118,7 +128,7 @@ const AddAuditorium = () => {
             <input type="file" accept="image/*" onChange={handleImageChange} className="w-full px-4 py-2 rounded-xl bg-white/60 border border-[#82181A]/30 focus:outline-none focus:ring-2 focus:ring-[#82181A]/40 shadow-sm" />
             <div className="mt-2 flex items-center justify-center">
               {imagePreview ? (
-                <img src={imagePreview} alt="Preview" className="h-32 w-32 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
+                <img src={imagePreview.startsWith('http') ? imagePreview : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${imagePreview}`} alt="Preview" className="h-32 w-32 object-cover rounded-xl shadow-lg border border-[#82181A]/30" />
               ) : (
                 <div className="h-32 w-32 flex items-center justify-center bg-white/40 text-[#82181A]/40 rounded-xl border border-[#82181A]/20 shadow">Image preview</div>
               )}

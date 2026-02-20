@@ -164,7 +164,7 @@ const CreateUser = () => {
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Page Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New User</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 mt-20">Create New User</h1>
           <p className="text-lg text-gray-600">Add a new user or administrator to the system</p>
         </div>
 
@@ -429,7 +429,7 @@ const CreateUser = () => {
         </div>
 
         {/* Instructions Card */}
-        <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-lg">
+        {/* <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-lg">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -457,7 +457,7 @@ const CreateUser = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
