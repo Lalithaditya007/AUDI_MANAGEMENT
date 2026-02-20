@@ -46,7 +46,7 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
                             <h1 className="text-lg sm:text-xl font-bold text-red-900 leading-tight">
                                 Vallurupalli Nageswara Rao <br className="hidden sm:inline" />Vignana Jyothi Institute
                             </h1>
-                            <p className="text-xs sm:text-sm text-red-900">Vignana Jyothi Nagar, Hyderabad</p>
+                            <p className="text-xs sm:text-sm text-red-900">Vignana Jyothi Nagar, Hyderabad.</p>
                         </div>
                     </div>
 
