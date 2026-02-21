@@ -1,3 +1,4 @@
+// Footer component with contact information and social links
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
