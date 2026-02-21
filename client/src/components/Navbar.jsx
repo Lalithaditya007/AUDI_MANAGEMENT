@@ -1,3 +1,4 @@
+// Navigation component for the application
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
