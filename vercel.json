@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "npm install --prefix client --include=optional ; npm install --prefix server",
-  "buildCommand": "npm run build --prefix client",
+  "installCommand": "npm install --prefix client --include=optional ; npm install --prefix client --no-save @rollup/rollup-linux-x64-gnu || npm install --prefix client --no-save @rollup/rollup-linux-x64-musl ; npm install --prefix server",
+  "buildCommand": "cd client && npx vite build",
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
