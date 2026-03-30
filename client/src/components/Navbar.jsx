@@ -1,6 +1,7 @@
 // Navigation component for the application
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import logo from "../assets/logo.png";
 
 const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail }) => {
     const location = useLocation();
@@ -39,7 +40,7 @@ const Navbar = ({ isLoggedIn, userRole, setIsLoggedIn, setUserRole, setUserEmail
                 <div className="container mx-auto flex justify-between items-center flex-wrap">
                     <div className="flex items-center space-x-4 mb-2 sm:mb-0 mr-4">
                         <img
-                            src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
+                            src={logo}
                             alt="VNR VJIET Symbol"
                             className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0"
                         />

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 // Simple fallback for when images don't load
 const fallbackGradient = "bg-gradient-to-r from-red-800 to-red-900";
 // API Base URL (needed for API calls, not necessarily image construction anymore)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const Events = () => {
   const [events, setEvents] = useState([]);

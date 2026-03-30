@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import clgss from "../assets/clgss.jpg"; // Ensure this path is correct
+import logo from "../assets/logo.png";
 
 // Receive the state setters from App.jsx
 const Login = ({ setIsLoggedIn, setUserRole, setUserEmail }) => {
@@ -29,7 +30,7 @@ const Login = ({ setIsLoggedIn, setUserRole, setUserEmail }) => {
     const normalizedEmail = email.toLowerCase();
 
     const loginEndpoint = role === "admin" ? "/api/auth/admin-login" : "/api/auth/user-login";
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${loginEndpoint}`;
+    const apiUrl = `${import.meta.env.VITE_API_URL || ''}${loginEndpoint}`;
     console.log(`[DEBUG] Attempting login to: ${apiUrl} as ${role}`);
     console.log(`[DEBUG] Using email: ${normalizedEmail} (original: ${email})`);
 
@@ -113,7 +114,7 @@ const Login = ({ setIsLoggedIn, setUserRole, setUserEmail }) => {
         <div className="flex justify-center mb-4">
           <div className="bg-white p-1.5 rounded-full">
             <img
-              src="http://automation.vnrvjiet.ac.in/EduPrime2/Content/Img/logo.png"
+              src={logo}
               alt="VNR VJIET Logo"
               className="h-16 w-16"
             />

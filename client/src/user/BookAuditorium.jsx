@@ -133,7 +133,7 @@ function BookAuditorium({ userEmail = "" }) {
   const fetchAuditoriums = useCallback(async () => {
     setIsLoadingAuditoriums(true);
     setAuditoriumFetchError("");
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auditoriums`;
+    const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/auditoriums`;
     console.log("[API Call] Fetching auditoriums from:", apiUrl);
     try {
       const response = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
@@ -148,7 +148,7 @@ function BookAuditorium({ userEmail = "" }) {
   const fetchDepartments = useCallback(async () => {
     setIsLoadingDepartments(true);
     setDepartmentFetchError("");
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/departments`;
+    const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/departments`;
     console.log("[API Call] Fetching departments from:", apiUrl);
     try {
       const response = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
@@ -185,7 +185,7 @@ function BookAuditorium({ userEmail = "" }) {
             throw new Error("Authentication token missing. Please log in again.");
         }
         
-        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/check-availability`;
+        const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/bookings/check-availability`;
         const queryParams = new URLSearchParams({
             auditoriumId: formData.auditoriumId,
             startTime: startDate.toISOString(),
@@ -285,7 +285,7 @@ function BookAuditorium({ userEmail = "" }) {
         const token = localStorage.getItem('authToken');
         if (!token) throw new Error("Authentication required.");
 
-        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings/check-availability`;
+        const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/bookings/check-availability`;
         const queryParams = new URLSearchParams({
             auditoriumId,
             startTime: startTimeStr,
@@ -381,7 +381,7 @@ function BookAuditorium({ userEmail = "" }) {
     if (formData.eventPoster) { 
       formDataToSend.append('eventPoster', formData.eventPoster, formData.eventPoster.name); 
     }
-    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/bookings`; 
+    const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/bookings`; 
     console.log("[DEBUG] POST to", apiUrl);
     try {
       const response = await fetch(apiUrl, { method: "POST", headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json", }, body: formDataToSend, });

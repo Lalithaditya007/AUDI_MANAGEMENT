@@ -16,7 +16,7 @@ const ImagePlaceholderIcon = () => (
 
 // Fallback image URL for img onError
 const ERROR_IMAGE_URL = "https://via.placeholder.com/150/FFEBEE/D32F2F?text=Load+Error";
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'; // Still needed for API calls
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''; // Still needed for API calls
 
 // --- Debounce Utility Function ---
 function debounce(func, wait) {

@@ -22,7 +22,7 @@ const CreateUser = () => {
     const fetchDepartments = async () => {
       try {
         const token = localStorage.getItem('authToken');
-        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/departments`;
+        const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/departments`;
         
         const response = await fetch(apiUrl, {
           headers: {
@@ -103,7 +103,7 @@ const CreateUser = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/admin/create-user`;
+      const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/auth/admin/create-user`;
       
       const payload = {
         username: formData.username.trim(),
