@@ -2,8 +2,7 @@
 
 const mongoose = require('mongoose');
 const { DateTime } = require('luxon'); // Ensure Luxon is imported
-const { BlobServiceClient } = require('@azure/storage-blob'); // Import Azure SDK
-const { v4: uuidv4 } = require('uuid'); // Using uuid for unique blob names
+const { uploadImageBuffer, deleteImageByUrl } = require('../utils/cloudinaryService');
 
 const Booking = require('../models/Booking');
 const Auditorium = require('../models/Auditorium');
@@ -26,21 +25,31 @@ const openingHourIST = 9;
 const bookingLeadTimeHours = 2; // Minimum lead time
 const bookingMaxAdvanceMonths = 3; // <<<--- NEW: Maximum months in advance
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
-const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const AZURE_STORAGE_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER_NAME;
 
-// --- Helper: Azure Blob Upload (No changes needed here) ---
+// --- Helper: Cloudinary Upload ---
 const uploadToAzure = async (buffer, originalname, mimetype) => {
-    // ... (keep existing implementation from previous step) ...
-    if (!AZURE_STORAGE_CONNECTION_STRING || !AZURE_STORAGE_CONTAINER_NAME) { console.error('[Azure Error] Missing Azure Storage connection string or container name in environment variables.'); throw new Error('Server configuration error: Azure Storage details missing.'); }
-    if (!buffer) { throw new Error('File buffer is missing for Azure upload.'); }
-    try { const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING); const containerClient = blobServiceClient.getContainerClient(AZURE_STORAGE_CONTAINER_NAME); const blobName = `event-images/${uuidv4()}-${originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`; const blockBlobClient = containerClient.getBlockBlobClient(blobName); console.log(`[Azure Upload] Attempting to upload blob: ${blobName} to container: ${AZURE_STORAGE_CONTAINER_NAME}`); const uploadOptions = { blobHTTPHeaders: { blobContentType: mimetype } }; const uploadBlobResponse = await blockBlobClient.uploadData(buffer, uploadOptions); console.log(`[Azure Upload] Successfully uploaded blob ${blobName}. ETag: ${uploadBlobResponse.etag}`); return blockBlobClient.url; } catch (error) { console.error(`[Azure Error] Failed to upload blob ${originalname}:`, error.message || error); if (error.code === 'AuthenticationFailed') { throw new Error('Azure Authentication Failed. Check connection string.'); } else if (error.code === 'ContainerNotFound') { throw new Error(`Azure Container Not Found: ${AZURE_STORAGE_CONTAINER_NAME}. Ensure it exists.`); } throw new Error(`Failed to upload image to Azure Storage. ${error.message}`); }
+        if (!buffer) {
+            throw new Error('File buffer is missing for Cloudinary upload.');
+        }
+
+        return uploadImageBuffer(buffer, {
+            folder: 'audibook/event-images',
+            originalname,
+            mimetype,
+        });
 };
 
-// --- Helper: Azure Blob Delete (No changes needed here) ---
+// --- Helper: Cloudinary Delete ---
 const deleteFromAzure = async (blobUrl) => {
-    // ... (keep existing implementation from previous step) ...
-     if (!blobUrl) { console.warn('[Azure Delete] No blob URL provided, skipping deletion.'); return; } if (!AZURE_STORAGE_CONNECTION_STRING || !AZURE_STORAGE_CONTAINER_NAME) { console.error('[Azure Error] Missing Azure Storage connection string or container name in environment variables for deletion.'); throw new Error('Server configuration error: Azure Storage details missing.'); } try { const urlParts = blobUrl.split('/'); const blobName = urlParts.slice(4).join('/'); if (!blobName) { throw new Error(`Could not parse blob name from URL: ${blobUrl}`); } const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING); const containerClient = blobServiceClient.getContainerClient(AZURE_STORAGE_CONTAINER_NAME); const blockBlobClient = containerClient.getBlockBlobClient(blobName); console.log(`[Azure Delete] Attempting to delete blob: ${blobName} from container: ${AZURE_STORAGE_CONTAINER_NAME}`); const deleteResponse = await blockBlobClient.deleteIfExists(); if (deleteResponse.succeeded) { console.log(`[Azure Delete] Successfully deleted blob: ${blobName}`); } else { console.warn(`[Azure Delete] Blob not found or already deleted: ${blobName} (ErrorCode: ${deleteResponse.errorCode})`); } } catch (error) { console.error(`[Azure Error] Failed to delete blob ${blobUrl}:`, error.message || error); }
+        if (!blobUrl) {
+            return;
+        }
+
+        try {
+            await deleteImageByUrl(blobUrl);
+        } catch (error) {
+            console.error(`[Cloudinary Error] Failed to delete image ${blobUrl}:`, error.message || error);
+        }
 };
 
 
@@ -109,7 +118,7 @@ exports.createBooking = async (req, res) => {
 
         if (req.file) {
             uploadedBlobUrl = await uploadToAzure(req.file.buffer, req.file.originalname, req.file.mimetype);
-            console.log(`[Create Booking] Azure upload successful. URL: ${uploadedBlobUrl}`);
+            console.log(`[Create Booking] Cloudinary upload successful. URL: ${uploadedBlobUrl}`);
         } else { console.log("[Create Booking] No file uploaded."); }
 
         const booking = new Booking({ eventName: eventName.trim(), description: description.trim(), startTime: validatedStartTime, endTime: validatedEndTime, auditorium: auditorium, department: department, user: userId, eventImages: uploadedBlobUrl ? [uploadedBlobUrl] : [], status: 'pending' });
@@ -123,9 +132,9 @@ exports.createBooking = async (req, res) => {
         res.status(201).json({ success: true, message: 'Booking request created successfully and is pending approval.', data: populatedBooking });
     } catch (error) {
         console.error("[Error] Create Booking Failed:", error);
-        if (uploadedBlobUrl) { console.error(`[Orphaned Blob Alert] Booking creation failed after Azure upload. Orphaned Blob URL: ${uploadedBlobUrl}`); }
-        if (error.message.includes('Azure Storage details missing') || error.message.includes('Azure Authentication Failed') || error.message.includes('Azure Container Not Found')) { return res.status(500).json({ success: false, message: `Server Configuration Error: ${error.message}` }); }
-        if (error.message.includes('Failed to upload image to Azure Storage')) { return res.status(500).json({ success: false, message: `Image Upload Failed: ${error.message}` }); }
+        if (uploadedBlobUrl) { console.error(`[Orphaned Image Alert] Booking creation failed after Cloudinary upload. Orphaned image URL: ${uploadedBlobUrl}`); }
+        if (error.message.includes('Cloudinary') || error.message.includes('Server configuration error')) { return res.status(500).json({ success: false, message: `Server Configuration Error: ${error.message}` }); }
+        if (error.message.includes('Image upload failed')) { return res.status(500).json({ success: false, message: `Image Upload Failed: ${error.message}` }); }
         if (error.name === 'ValidationError' || error.name === 'CastError') { return res.status(400).json({ success: false, message: error.message }); }
         if (!res.headersSent) { res.status(500).json({ success: false, message: error.message || 'Server error creating booking request.' }); }
     }
@@ -164,7 +173,7 @@ exports.getBookingStats = async (req, res, next) => {
 // --- withdrawBooking (User) (No changes needed) ---
 exports.withdrawBooking = async (req, res, next) => {
     // ... (keep existing implementation) ...
-     const bookingId = req.params.id; const userId = req.user._id; if (!mongoose.Types.ObjectId.isValid(bookingId)) { return res.status(400).json({ success: false, message: 'Invalid booking ID format.' }); } try { const booking = await Booking.findOne({ _id: bookingId, user: userId }).populate('user', 'email username').populate('auditorium', 'name').populate('department', 'name'); if (!booking) { return res.status(404).json({ success: false, message: 'Booking not found or permission denied.' }); } if (!['pending', 'approved'].includes(booking.status)) { return res.status(400).json({ success: false, message: `Cannot withdraw a booking with status: '${booking.status}'.` }); } if (booking.status === 'approved') { const nowIST = DateTime.now().setZone(istTimezone); const startTimeIST = DateTime.fromJSDate(booking.startTime).setZone(istTimezone); const allowedWithdrawTimeIST = startTimeIST.minus({ hours: bookingLeadTimeHours }); if (nowIST >= allowedWithdrawTimeIST) { return res.status(400).json({ success: false, message: `Approved bookings cannot be withdrawn less than ${bookingLeadTimeHours} hours before start time.` }); } } if (booking.eventImages && booking.eventImages.length > 0) { console.log(`[Withdrawal Cleanup] Preparing to delete Azure blobs for booking ${bookingId}`); const deletePromises = booking.eventImages.map(imageUrl => deleteFromAzure(imageUrl).catch(err => { console.error(`[Withdrawal Cleanup Error] Failed to delete blob ${imageUrl}: ${err.message}`); return { status: 'rejected', reason: err }; })); await Promise.allSettled(deletePromises); console.log(`[Withdrawal Cleanup] Finished attempting Azure blob deletions for booking ${bookingId}`); } else { console.log(`[Withdrawal Cleanup] No Azure blobs associated with booking ${bookingId}.`); } try { if (booking.user?.email) { await sendBookingWithdrawalConfirmationEmail(booking.user.email, booking, booking.auditorium, booking.department); } } catch (emailError) { console.error(`[Non-critical Error] Sending withdrawal confirmation email failed:`, emailError); } const deleteResult = await Booking.deleteOne({ _id: bookingId, user: userId }); if (deleteResult.deletedCount === 0) { return res.status(404).json({ success: false, message: 'Booking not found or already withdrawn.' }); } console.log(`Booking ${bookingId} (${booking.eventName}) successfully withdrawn by user ${userId}.`); res.status(200).json({ success: true, message: 'Booking withdrawn successfully.' }); } catch (error) { console.error(`[Error] Withdrawing booking ${bookingId} failed:`, error); if (error.message.includes('Azure Storage details missing')) { return res.status(500).json({ success: false, message: `Server Configuration Error: ${error.message}` }); } if (!res.headersSent) { res.status(500).json({ success: false, message: 'Server error withdrawing booking.' }); } }
+    const bookingId = req.params.id; const userId = req.user._id; if (!mongoose.Types.ObjectId.isValid(bookingId)) { return res.status(400).json({ success: false, message: 'Invalid booking ID format.' }); } try { const booking = await Booking.findOne({ _id: bookingId, user: userId }).populate('user', 'email username').populate('auditorium', 'name').populate('department', 'name'); if (!booking) { return res.status(404).json({ success: false, message: 'Booking not found or permission denied.' }); } if (!['pending', 'approved'].includes(booking.status)) { return res.status(400).json({ success: false, message: `Cannot withdraw a booking with status: '${booking.status}'.` }); } if (booking.status === 'approved') { const nowIST = DateTime.now().setZone(istTimezone); const startTimeIST = DateTime.fromJSDate(booking.startTime).setZone(istTimezone); const allowedWithdrawTimeIST = startTimeIST.minus({ hours: bookingLeadTimeHours }); if (nowIST >= allowedWithdrawTimeIST) { return res.status(400).json({ success: false, message: `Approved bookings cannot be withdrawn less than ${bookingLeadTimeHours} hours before start time.` }); } } if (booking.eventImages && booking.eventImages.length > 0) { console.log(`[Withdrawal Cleanup] Preparing to delete Cloudinary images for booking ${bookingId}`); const deletePromises = booking.eventImages.map(imageUrl => deleteFromAzure(imageUrl).catch(err => { console.error(`[Withdrawal Cleanup Error] Failed to delete image ${imageUrl}: ${err.message}`); return { status: 'rejected', reason: err }; })); await Promise.allSettled(deletePromises); console.log(`[Withdrawal Cleanup] Finished attempting Cloudinary image deletions for booking ${bookingId}`); } else { console.log(`[Withdrawal Cleanup] No images associated with booking ${bookingId}.`); } try { if (booking.user?.email) { await sendBookingWithdrawalConfirmationEmail(booking.user.email, booking, booking.auditorium, booking.department); } } catch (emailError) { console.error(`[Non-critical Error] Sending withdrawal confirmation email failed:`, emailError); } const deleteResult = await Booking.deleteOne({ _id: bookingId, user: userId }); if (deleteResult.deletedCount === 0) { return res.status(404).json({ success: false, message: 'Booking not found or already withdrawn.' }); } console.log(`Booking ${bookingId} (${booking.eventName}) successfully withdrawn by user ${userId}.`); res.status(200).json({ success: true, message: 'Booking withdrawn successfully.' }); } catch (error) { console.error(`[Error] Withdrawing booking ${bookingId} failed:`, error); if (error.message.includes('Cloudinary') || error.message.includes('Server configuration error')) { return res.status(500).json({ success: false, message: `Server Configuration Error: ${error.message}` }); } if (!res.headersSent) { res.status(500).json({ success: false, message: 'Server error withdrawing booking.' }); } }
 };
 
 // --- requestReschedule (User) (Uses the modified validateBookingTime) ---

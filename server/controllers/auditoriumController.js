@@ -3,6 +3,7 @@ const mongoose = require('mongoose'); // Needed for ObjectId validation
 const Auditorium = require('../models/Auditorium'); // Import the Auditorium model
 const Booking = require('../models/Booking'); // Assuming you have a Booking model
 const { DateTime } = require('luxon'); // Assuming you use Luxon for date handling
+const { uploadImageBuffer } = require('../utils/cloudinaryService');
 
 // Define IST timezone if used in getAuditoriumSchedule
 const istTimezone = 'Asia/Kolkata';
@@ -31,9 +32,7 @@ exports.createAuditorium = async (req, res, next) => {
   const createdBy = body.createdBy;
   const customFields = body.customFields;
   let images = [];
-  if (req.file) {
-    images.push(`/uploads/${req.file.filename}`);
-  } else if (body.images) {
+  if (body.images) {
     // fallback for JSON
     images = Array.isArray(body.images) ? body.images : [body.images];
   }
@@ -52,6 +51,15 @@ exports.createAuditorium = async (req, res, next) => {
         success: false,
         message: `An auditorium with the name "${name}" already exists.`,
       });
+    }
+
+    if (req.file) {
+      const imageUrl = await uploadImageBuffer(req.file.buffer, {
+        folder: 'audibook/auditoriums',
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+      });
+      images.push(imageUrl);
     }
 
     const auditorium = await Auditorium.create({

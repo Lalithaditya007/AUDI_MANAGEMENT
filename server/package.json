@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --quiet server.js"
+    "start": "nodemon --quiet server.js",
+    "reset-credentials": "node scripts/resetCredentials.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +15,7 @@
     "@azure/storage-blob": "^12.27.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",

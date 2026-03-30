@@ -81,7 +81,7 @@ app.use((err, req, res, next) => {
     const statusCode = res.statusCode === 200 ? (err.statusCode || 500) : res.statusCode;
     console.error("--- UNHANDLED ERROR ---"); console.error("Message:", err.message); console.error("Status Code:", statusCode); console.error("Stack:", process.env.NODE_ENV === 'production' ? 'omitted' : err.stack);
     if (err instanceof multer.MulterError) { return res.status(400).json({ success: false, message: `File Upload Error: ${err.code} - ${err.message}` }); }
-    else if (err.message?.includes('Invalid file type') || err.message?.includes('Azure') || err.message?.includes('Server configuration error')) { return res.status(statusCode < 500 ? statusCode : 400).json({ success: false, message: err.message }); }
+    else if (err.message?.includes('Invalid file type') || err.message?.includes('Azure') || err.message?.includes('Cloudinary') || err.message?.includes('Server configuration error')) { return res.status(statusCode < 500 ? statusCode : 400).json({ success: false, message: err.message }); }
     else { return res.status(statusCode).json({ success: false, message: err.message || 'An unexpected server error occurred.' }); }
 });
 
