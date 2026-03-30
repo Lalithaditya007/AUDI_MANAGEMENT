@@ -4,8 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --quiet server.js",
-    "reset-credentials": "node scripts/resetCredentials.js"
+    "start": "nodemon --quiet server.js"
   },
   "keywords": [],
   "author": "",
